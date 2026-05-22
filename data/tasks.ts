@@ -1,148 +1,87 @@
 import { CalendarDays, CheckCircle2, Clock3, FileText, LayoutList, PencilLine, ShieldCheck } from "lucide-react-native";
 import type { ComponentType } from "react";
 
-export type TaskStatus = "completed" | "in-progress" | "pending";
+export type TaskStatus = "pending" | "in_progress" | "completed";
+export type TaskPriority = "Low" | "Medium" | "High";
+export type ReminderOption = "none" | "due_time" | "5_minutes" | "10_minutes" | "30_minutes" | "1_hour" | "1_day" | "custom";
+
+export type Subtask = {
+  id: string;
+  title: string;
+  completed: boolean;
+};
 
 export type Task = {
   id: string;
   title: string;
-  time: string;
   status: TaskStatus;
-  priority: "Low" | "Medium" | "High";
-  project: string;
   dueDate: string;
-  flag: "green" | "gray" | "blue" | "red";
+  dueTime: string;
+  priority: TaskPriority;
+  category: string;
   description: string;
-  subtasks: {
-    title: string;
-    done: boolean;
-  }[];
+  reminderOption: ReminderOption;
+  reminderAt: string | null;
+  notificationId: string | null;
+  subtasks: Subtask[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
 };
 
-export const tasks: Task[] = [
-  {
-    id: "design-landing-page",
-    title: "Design landing page",
-    time: "9:00 AM",
-    status: "in-progress",
-    priority: "Medium",
-    project: "Website Redesign",
-    dueDate: "May 24, 2026",
-    flag: "green",
-    description: "Create a modern and minimal landing page according to the new brand guidelines.",
-    subtasks: [
-      { title: "Create wireframe", done: true },
-      { title: "Design hero section", done: true },
-      { title: "Design features section", done: false },
-      { title: "Add responsive layout", done: false }
-    ]
-  },
-  {
-    id: "review-project-proposal",
-    title: "Review project proposal",
-    time: "11:00 AM",
-    status: "pending",
-    priority: "Low",
-    project: "Website Redesign",
-    dueDate: "May 25, 2026",
-    flag: "gray",
-    description: "Read the proposal draft and leave concise comments for the product team.",
-    subtasks: [
-      { title: "Read introduction", done: true },
-      { title: "Check timeline", done: false },
-      { title: "Send comments", done: false }
-    ]
-  },
-  {
-    id: "update-task-tracker-ui",
-    title: "Update task tracker UI",
-    time: "1:00 PM",
-    status: "pending",
-    priority: "Medium",
-    project: "Internal Tools",
-    dueDate: "May 26, 2026",
-    flag: "gray",
-    description: "Refresh task cards, filters, and the bottom navigation for the mobile tracker.",
-    subtasks: [
-      { title: "Audit existing screens", done: true },
-      { title: "Prepare components", done: false },
-      { title: "Ship polish pass", done: false }
-    ]
-  },
-  {
-    id: "team-stand-up-meeting",
-    title: "Team stand-up meeting",
-    time: "3:00 PM",
-    status: "pending",
-    priority: "High",
-    project: "Operations",
-    dueDate: "May 22, 2026",
-    flag: "red",
-    description: "Share blockers, priorities, and handoffs with the design and engineering teams.",
-    subtasks: [
-      { title: "Prepare notes", done: false },
-      { title: "Join meeting", done: false }
-    ]
-  },
-  {
-    id: "write-documentation",
-    title: "Write documentation",
-    time: "5:00 PM",
-    status: "pending",
-    priority: "Low",
-    project: "Internal Tools",
-    dueDate: "May 27, 2026",
-    flag: "blue",
-    description: "Document the new task statuses, list filters, and project progress states.",
-    subtasks: [
-      { title: "Draft outline", done: false },
-      { title: "Add screenshots", done: false },
-      { title: "Request review", done: false }
-    ]
-  }
+export type TaskInput = {
+  title: string;
+  dueDate: string;
+  dueTime: string;
+  priority: TaskPriority;
+  category: string;
+  description: string;
+  reminderOption: ReminderOption;
+  reminderAt: string | null;
+};
+
+export const priorityOrder: TaskPriority[] = ["Low", "Medium", "High"];
+
+export const categoryOptions = [
+  "General",
+  "Task Tracker",
+  "Startup",
+  "Work",
+  "Personal",
+  "Study / College",
+  "Money / Finance",
+  "Fitness / Health",
+  "Learning / Skills",
+  "Content / Marketing",
+  "Client Work",
+  "Home / Family",
+  "Website Redesign"
 ];
 
-export const projectTasks = [
-  tasks[0],
-  {
-    ...tasks[1],
-    id: "create-style-guide",
-    title: "Create style guide",
-    time: "10:00 AM",
-    status: "completed" as const,
-    flag: "green" as const
-  },
-  {
-    ...tasks[2],
-    id: "develop-pages",
-    title: "Develop pages",
-    time: "2:00 PM"
-  },
-  {
-    ...tasks[4],
-    id: "testing-qa",
-    title: "Testing & QA",
-    time: "4:00 PM",
-    priority: "High" as const
-  }
+export const reminderOptions: { label: string; value: ReminderOption }[] = [
+  { label: "No reminder", value: "none" },
+  { label: "At due time", value: "due_time" },
+  { label: "5 minutes before", value: "5_minutes" },
+  { label: "10 minutes before", value: "10_minutes" },
+  { label: "30 minutes before", value: "30_minutes" },
+  { label: "1 hour before", value: "1_hour" },
+  { label: "1 day before", value: "1_day" },
+  { label: "Custom", value: "custom" }
 ];
 
 export const stats = [
   {
     label: "Total Tasks",
-    value: "8",
     tone: "green" as const,
     icon: CheckCircle2
   },
   {
     label: "Completed",
-    value: "5",
     tone: "blue" as const,
     icon: ShieldCheck
   },
   {
     label: "Pending",
-    value: "3",
     tone: "orange" as const,
     icon: Clock3
   }
@@ -153,8 +92,93 @@ export const overviewItems: {
   value: string;
   icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 }[] = [
-  { label: "Timeline", value: "May 22-31", icon: CalendarDays },
-  { label: "Scope", value: "4 tracked tasks", icon: LayoutList },
-  { label: "Brief", value: "Minimal, friendly redesign", icon: FileText },
-  { label: "Design", value: "Landing flow first", icon: PencilLine }
+  { label: "Timeline", value: "Active task window", icon: CalendarDays },
+  { label: "Scope", value: "Live user tasks", icon: LayoutList },
+  { label: "Brief", value: "Minimal, focused tracking", icon: FileText },
+  { label: "Design", value: "Today-first workflow", icon: PencilLine }
 ];
+
+export function createId(prefix = "item") {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function todayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function parseDateKey(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
+export function formatDateLabel(value: string) {
+  const date = parseDateKey(value);
+  if (Number.isNaN(date.getTime())) {
+    return value || "No date";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+export function formatMonthTitle(date: Date) {
+  return date.toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric"
+  });
+}
+
+export function formatTimeFromIso(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+  return new Date(value).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+export function sectionLabelForDate(dateKey: string) {
+  const selected = parseDateKey(dateKey);
+  const today = parseDateKey(todayKey());
+  const delta = Math.round((today.getTime() - selected.getTime()) / 86400000);
+
+  if (delta === 0) {
+    return "Today";
+  }
+  if (delta === 1) {
+    return "Yesterday";
+  }
+  if (delta === 2) {
+    return "2 days ago";
+  }
+  return formatDateLabel(dateKey);
+}
+
+export function statusLabel(status: TaskStatus) {
+  if (status === "completed") {
+    return "Completed";
+  }
+  if (status === "in_progress") {
+    return "In Progress";
+  }
+  return "Pending";
+}
+
+export function sortTasksForToday(a: Task, b: Task) {
+  return a.dueTime.localeCompare(b.dueTime) || a.createdAt.localeCompare(b.createdAt);
+}
+
+export function isActiveTask(task: Task) {
+  return task.status === "pending" || task.status === "in_progress";
+}
+
+export function completionDateKey(task: Task) {
+  return task.completedAt ? todayKey(new Date(task.completedAt)) : null;
+}

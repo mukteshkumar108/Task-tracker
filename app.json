@@ -7,15 +7,29 @@
     "scheme": "tasktracker",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "android": {
+      "package": "com.muktesh.tasktracker",
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ]
+    },
     "web": {
       "bundler": "metro",
       "output": "single"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8cc6eefd-cde9-41ae-8f8e-e9f0bbe753ad"
+      }
+    },
+    "owner": "muktesh-dev"
   }
 }

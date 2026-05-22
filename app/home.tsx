@@ -1,12 +1,32 @@
 import { useRouter } from "expo-router";
-import { Bell, CalendarDays, Flag, Home, LayoutList, Menu, Plus, UserRound } from "lucide-react-native";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import {
+  Archive,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  CircleHelp,
+  Flag,
+  Folder,
+  Home,
+  Info,
+  LogOut,
+  Menu,
+  Pencil,
+  Plus,
+  Settings,
+  X
+} from "lucide-react-native";
+import type { ComponentType, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 
-import { AppShell, CheckMark, IconButton, RowDisclosure, SectionHeader, shadowTiny } from "@/components/ui";
-import { colors, radii } from "@/constants/theme";
-import { stats, tasks } from "@/data/tasks";
+import { AppShell, BottomNav, IconButton, RowDisclosure, SectionHeader, shadowTiny } from "@/components/ui";
+import { radii } from "@/constants/theme";
+import { useAppState } from "@/contexts/app-state";
+import { stats, type TaskPriority } from "@/data/tasks";
 
-function StatCard({ item }: { item: (typeof stats)[number] }) {
+function StatCard({ item, value }: { item: (typeof stats)[number]; value: number }) {
+  const { colors } = useAppState();
   const Icon = item.icon;
   const tone = item.tone === "green" ? colors.green : item.tone === "blue" ? colors.blue : colors.orange;
   const bg = item.tone === "green" ? colors.greenSoft : item.tone === "blue" ? colors.blueSoft : colors.orangeSoft;
@@ -31,7 +51,7 @@ function StatCard({ item }: { item: (typeof stats)[number] }) {
       </View>
       <View style={{ gap: 6 }}>
         <Text selectable style={{ fontSize: 24, color: colors.ink, fontWeight: "900", fontVariant: ["tabular-nums"] }}>
-          {item.value}
+          {value}
         </Text>
         <Text selectable numberOfLines={1} style={{ fontSize: 12, color: colors.muted, fontWeight: "600" }}>
           {item.label}
@@ -41,38 +61,234 @@ function StatCard({ item }: { item: (typeof stats)[number] }) {
   );
 }
 
-function BottomNav() {
-  const items = [
-    { label: "Home", icon: Home, active: true },
-    { label: "Calendar", icon: CalendarDays },
-    { label: "Tasks", icon: LayoutList },
-    { label: "Profile", icon: UserRound }
-  ];
+function priorityFlagColor(priority: TaskPriority, colors: ReturnType<typeof useAppState>["colors"]) {
+  if (priority === "High") {
+    return colors.red;
+  }
+  if (priority === "Medium") {
+    return colors.green;
+  }
+  return colors.blue;
+}
+
+function DrawerItem({
+  label,
+  icon: Icon,
+  active = false,
+  destructive = false,
+  accessory,
+  onPress
+}: {
+  label: string;
+  icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  active?: boolean;
+  destructive?: boolean;
+  accessory?: ReactNode;
+  onPress?: () => void;
+}) {
+  const { colors } = useAppState();
+  const tone = destructive ? colors.red : active ? colors.greenDark : colors.ink;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        minHeight: 56,
+        borderRadius: radii.md,
+        borderCurve: "continuous",
+        paddingHorizontal: 18,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 18,
+        backgroundColor: active ? colors.greenSoft : "transparent",
+        opacity: pressed ? 0.68 : 1
+      })}
+    >
+      <Icon size={26} color={tone} strokeWidth={2} />
+      <Text selectable style={{ flex: 1, color: tone, fontSize: 19, fontWeight: active ? "800" : "500" }}>
+        {label}
+      </Text>
+      {accessory}
+    </Pressable>
+  );
+}
+
+function DrawerMenu({ onClose }: { onClose: () => void }) {
+  const { colors, themeMode, toggleTheme, user, updateUserName, signOut } = useAppState();
+  const router = useRouter();
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(user?.name ?? "Alex");
+  const firstInitial = (user?.name?.trim()?.[0] ?? "A").toUpperCase();
+  const menuItems = [
+    { label: "Home", icon: Home, href: "/home", active: true },
+    { label: "Calendar", icon: CalendarDays, href: "/calendar" },
+    { label: "All Tasks", icon: CheckCircle2, href: "/project/all" },
+    { label: "Categories", icon: Folder, href: "/project/all" },
+    { label: "Priorities", icon: Flag, href: "/project/all" },
+    { label: "Reminders", icon: Bell, href: "/project/all" },
+    { label: "Completed", icon: CheckCircle2, href: "/tasks" },
+    { label: "Archive", icon: Archive, href: "/tasks" }
+  ] as const;
+  const secondaryItems = [
+    {
+      label: "Settings",
+      icon: Settings,
+      onPress: toggleTheme,
+      accessory: (
+        <View style={{ minWidth: 52, borderRadius: radii.pill, borderCurve: "continuous", backgroundColor: colors.faint, paddingHorizontal: 10, paddingVertical: 6 }}>
+          <Text selectable style={{ color: colors.muted, fontSize: 12, fontWeight: "900", textAlign: "center" }}>
+            {themeMode === "dark" ? "Dark" : "Light"}
+          </Text>
+        </View>
+      )
+    },
+    { label: "Help & Support", icon: CircleHelp, onPress: undefined },
+    { label: "About Task Tracker", icon: Info, onPress: undefined }
+  ] as const;
+  const navigateTo = (href: string) => {
+    onClose();
+    router.push(href as never);
+  };
 
   return (
     <View
       style={{
-        height: 80,
-        borderTopWidth: 1,
-        borderTopColor: colors.line,
-        backgroundColor: colors.surface,
-        paddingHorizontal: 22,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between"
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 5,
+        flexDirection: "row"
       }}
     >
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Pressable key={item.label} style={{ alignItems: "center", gap: 6, minWidth: 58 }}>
-            <Icon size={22} color={item.active ? colors.green : colors.muted} strokeWidth={2.2} fill={item.active ? colors.green : "transparent"} />
-            <Text selectable style={{ color: item.active ? colors.greenDark : colors.muted, fontSize: 11, fontWeight: item.active ? "800" : "600" }}>
-              {item.label}
+      <View
+        style={{
+          width: 312,
+          backgroundColor: colors.surface,
+          borderTopRightRadius: 24,
+          borderBottomRightRadius: 24,
+          borderCurve: "continuous",
+          paddingTop: 54,
+          paddingHorizontal: 18,
+          paddingBottom: 24,
+          gap: 20,
+          boxShadow: `12px 0 34px ${colors.shadow}`
+        }}
+      >
+        <View style={{ alignItems: "flex-end" }}>
+          <IconButton onPress={onClose}>
+            <X size={28} color={colors.ink} strokeWidth={2} />
+          </IconButton>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 20, paddingHorizontal: 18 }}>
+          <View
+            style={{
+              width: 78,
+              height: 78,
+              borderRadius: 39,
+              backgroundColor: colors.greenSoft,
+              alignItems: "center",
+              justifyContent: "center"
+            }}
+          >
+            <Text selectable style={{ color: colors.greenDark, fontSize: 34, fontWeight: "900" }}>
+              {firstInitial}
             </Text>
-          </Pressable>
-        );
-      })}
+          </View>
+          <View style={{ flex: 1, gap: 6 }}>
+            {editingName ? (
+              <TextInput
+                autoFocus
+                value={draftName}
+                onChangeText={setDraftName}
+                onSubmitEditing={() => {
+                  updateUserName(draftName);
+                  setEditingName(false);
+                }}
+                placeholder="Your name"
+                placeholderTextColor={colors.muted}
+                style={{
+                  minHeight: 42,
+                  borderRadius: radii.sm,
+                  borderCurve: "continuous",
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  color: colors.text,
+                  paddingHorizontal: 10,
+                  fontSize: 17,
+                  fontWeight: "800"
+                }}
+              />
+            ) : (
+              <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 21, fontWeight: "900" }}>
+                {user?.name ?? "Alex"}
+              </Text>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={editingName ? "Save name" : "Edit name"}
+              onPress={() => {
+                if (editingName) {
+                  updateUserName(draftName);
+                }
+                setEditingName((editing) => !editing);
+              }}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 8, opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text selectable style={{ color: colors.greenDark, fontSize: 16, fontWeight: "800" }}>
+                {editingName ? "Save name" : "Edit name"}
+              </Text>
+              <Pencil size={18} color={colors.greenDark} strokeWidth={2.2} />
+            </Pressable>
+          </View>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 18, paddingBottom: 4 }}>
+          <View style={{ gap: 6 }}>
+            {menuItems.map((item) => (
+              <DrawerItem
+                key={item.label}
+                label={item.label}
+                icon={item.icon}
+                active={"active" in item ? item.active : false}
+                onPress={() => navigateTo(item.href)}
+              />
+            ))}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: colors.line, marginHorizontal: 18 }} />
+
+          <View style={{ gap: 6 }}>
+            {secondaryItems.map((item) => (
+              <DrawerItem
+                key={item.label}
+                label={item.label}
+                icon={item.icon}
+                accessory={"accessory" in item ? item.accessory : undefined}
+                onPress={item.onPress}
+              />
+            ))}
+          </View>
+
+          <View style={{ height: 1, backgroundColor: colors.line, marginHorizontal: 18 }} />
+
+          <DrawerItem
+            label="Log out"
+            icon={LogOut}
+            destructive
+            onPress={() => {
+              signOut();
+              onClose();
+              router.replace("/");
+            }}
+          />
+        </ScrollView>
+      </View>
+      <Pressable style={{ flex: 1, backgroundColor: themeMode === "dark" ? "rgba(0,0,0,0.54)" : "rgba(21,28,38,0.44)" }} onPress={onClose} />
     </View>
   );
 }
@@ -80,62 +296,105 @@ function BottomNav() {
 export default function HomeScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const { colors, user, loading, error, todayTasks, todayCounts, clearError } = useAppState();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
   const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
+  const counterValues = [todayCounts.total, todayCounts.completed, todayCounts.pending];
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/");
+    }
+  }, [loading, router, user]);
 
   return (
     <AppShell scroll={false}>
       <View style={{ flex: 1, paddingTop: 44 }}>
         <View style={{ width: contentWidth, alignSelf: "center", gap: 26, flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <IconButton>
+            <IconButton accessibilityLabel="Open menu" onPress={() => setDrawerOpen(true)}>
               <Menu size={26} color={colors.ink} strokeWidth={2} />
             </IconButton>
             <Text selectable style={{ color: colors.ink, fontSize: 18, fontWeight: "900" }}>
               Today
             </Text>
-            <IconButton>
+            <IconButton accessibilityLabel="Notifications">
               <Bell size={24} color={colors.ink} strokeWidth={2} />
             </IconButton>
           </View>
 
           <View style={{ gap: 8 }}>
             <Text selectable style={{ color: colors.ink, fontSize: 21, fontWeight: "900" }}>
-              {greeting}, Alex!
+              {greeting}, {user?.name ?? "there"}!
             </Text>
             <Text selectable style={{ color: colors.muted, fontSize: 15 }}>
-              You have 8 tasks today
+              {loading ? "Loading tasks..." : `You have ${todayCounts.pending} ${todayCounts.pending === 1 ? "task" : "tasks"} left today`}
             </Text>
           </View>
 
+          {error ? (
+            <Pressable onPress={clearError} style={{ borderRadius: radii.sm, borderCurve: "continuous", backgroundColor: colors.orangeSoft, padding: 12 }}>
+              <Text selectable style={{ color: colors.orange, fontWeight: "800", fontSize: 13 }}>
+                {error}
+              </Text>
+            </Pressable>
+          ) : null}
+
           <View style={{ flexDirection: "row", gap: 12 }}>
-            {stats.map((item) => (
-              <StatCard key={item.label} item={item} />
+            {stats.map((item, index) => (
+              <StatCard key={item.label} item={item} value={counterValues[index] ?? 0} />
             ))}
           </View>
 
           <View style={{ gap: 14, flex: 1 }}>
-            <SectionHeader title="Today's Tasks" actionHref="/project/website-redesign" actionLabel="View all" />
+            <SectionHeader title="Today's Tasks" actionHref="/project/all" actionLabel="View all" />
             <View style={{ gap: 12 }}>
-              {tasks.map((task) => {
-                const flagColor = task.flag === "green" ? colors.green : task.flag === "blue" ? colors.blue : task.flag === "red" ? colors.red : colors.muted;
-                return (
+              {loading ? (
+                <Text selectable style={{ color: colors.muted, fontSize: 15 }}>
+                  Fetching your tasks...
+                </Text>
+              ) : todayTasks.length === 0 ? (
+                <View
+                  style={{
+                    minHeight: 120,
+                    borderRadius: radii.md,
+                    borderCurve: "continuous",
+                    borderWidth: 1,
+                    borderColor: colors.line,
+                    backgroundColor: colors.surface,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 20
+                  }}
+                >
+                  <Text selectable style={{ color: colors.ink, fontSize: 16, fontWeight: "900" }}>
+                    No tasks for today
+                  </Text>
+                  <Text selectable style={{ color: colors.muted, fontSize: 13, marginTop: 6, textAlign: "center" }}>
+                    Tap the plus button to add one.
+                  </Text>
+                </View>
+              ) : (
+                todayTasks.map((task) => (
                   <RowDisclosure
                     key={task.id}
                     href={`/task/${task.id}`}
                     title={task.title}
-                    subtitle={task.time}
-                    right={<Flag size={19} color={flagColor} strokeWidth={2.1} fill={task.flag === "green" ? colors.greenSoft : "transparent"} />}
+                    subtitle={task.dueTime}
+                    checked={false}
+                    right={<Flag size={19} color={priorityFlagColor(task.priority, colors)} strokeWidth={2.1} />}
                   />
-                );
-              })}
+                ))
+              )}
             </View>
           </View>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push("/task/design-landing-page")}
+          accessibilityLabel="Add task"
+          onPress={() => router.push("/task-form" as never)}
           style={({ pressed }) => ({
             position: "absolute",
             right: 22,
@@ -153,7 +412,8 @@ export default function HomeScreen() {
           <Plus size={31} color={colors.surface} strokeWidth={2.2} />
         </Pressable>
 
-        <BottomNav />
+        <BottomNav active="home" />
+        {drawerOpen ? <DrawerMenu onClose={() => setDrawerOpen(false)} /> : null}
       </View>
     </AppShell>
   );

@@ -1,42 +1,49 @@
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { BriefcaseBusiness, ChevronLeft, MoreVertical, Plus } from "lucide-react-native";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { AppShell, CheckMark, EmptyCircle, IconButton, SoftButton, StatusPill } from "@/components/ui";
-import { colors, radii } from "@/constants/theme";
-import { overviewItems, projectTasks } from "@/data/tasks";
+import { radii } from "@/constants/theme";
+import { useAppState } from "@/contexts/app-state";
+import { overviewItems, type Task } from "@/data/tasks";
+import { goBackOrReplace } from "@/lib/navigation";
+
+function slugCategory(category: string) {
+  return category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
 
 export default function ProjectScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
+  const { colors, user, loading, tasks } = useAppState();
   const [tab, setTab] = useState<"tasks" | "overview">("tasks");
-  const [extraTask, setExtraTask] = useState(false);
   const contentWidth = Math.max(300, Math.min(width, 430) - 48);
-  const visibleTasks = useMemo(
-    () =>
-      extraTask
-        ? [
-            ...projectTasks,
-            {
-              ...projectTasks[2],
-              id: "launch-copy",
-              title: "Polish launch copy",
-              status: "pending" as const
-            }
-          ]
-        : projectTasks,
-    [extraTask]
-  );
+  const visibleTasks = useMemo(() => {
+    if (!id || id === "all") {
+      return tasks;
+    }
+    return tasks.filter((task) => slugCategory(task.category) === id);
+  }, [id, tasks]);
+  const projectName = id === "all" || !id ? "All Tasks" : visibleTasks[0]?.category ?? "Category";
+  const completed = visibleTasks.filter((task) => task.status === "completed").length;
+  const progress = visibleTasks.length ? Math.round((completed / visibleTasks.length) * 100) : 0;
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/");
+    }
+  }, [loading, router, user]);
 
   return (
     <AppShell scroll={false}>
       <View style={{ width: contentWidth, alignSelf: "center", flex: 1, minHeight: 820, paddingTop: 44, paddingBottom: 30, gap: 28 }}>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <IconButton onPress={() => router.back()}>
+          <IconButton accessibilityLabel="Back" onPress={() => goBackOrReplace(router, "/home")}>
             <ChevronLeft size={28} color={colors.ink} strokeWidth={2} />
           </IconButton>
-          <IconButton>
+          <IconButton accessibilityLabel="Project options">
             <MoreVertical size={25} color={colors.ink} strokeWidth={2} />
           </IconButton>
         </View>
@@ -56,18 +63,18 @@ export default function ProjectScreen() {
             <BriefcaseBusiness size={49} color={colors.violet} strokeWidth={2.1} />
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
-            <Text selectable style={{ color: colors.ink, fontSize: 20, fontWeight: "900" }}>
-              Website Redesign
+            <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 20, fontWeight: "900" }}>
+              {projectName}
             </Text>
             <Text selectable style={{ color: colors.muted, fontSize: 15, fontWeight: "600" }}>
-              {visibleTasks.length} tasks
+              {visibleTasks.length} {visibleTasks.length === 1 ? "task" : "tasks"}
             </Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: "#e4e6fb", overflow: "hidden" }}>
-                <View style={{ width: "75%", height: "100%", borderRadius: 3, backgroundColor: colors.violet }} />
+              <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: colors.violetSoft, overflow: "hidden" }}>
+                <View style={{ width: `${progress}%`, height: "100%", borderRadius: 3, backgroundColor: colors.violet }} />
               </View>
               <Text selectable style={{ color: colors.muted, fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] }}>
-                75%
+                {progress}%
               </Text>
             </View>
           </View>
@@ -79,7 +86,7 @@ export default function ProjectScreen() {
             padding: 4,
             borderRadius: radii.sm,
             borderCurve: "continuous",
-            backgroundColor: "#f6f6f7",
+            backgroundColor: colors.faint,
             flexDirection: "row"
           }}
         >
@@ -106,31 +113,39 @@ export default function ProjectScreen() {
 
         {tab === "tasks" ? (
           <View style={{ gap: 14, flex: 1 }}>
-            {visibleTasks.map((task) => (
-              <Pressable
-                key={task.id}
-                style={({ pressed }) => ({
-                  minHeight: 62,
-                  borderRadius: radii.md,
-                  borderCurve: "continuous",
-                  borderWidth: 1,
-                  borderColor: colors.line,
-                  backgroundColor: colors.surface,
-                  paddingHorizontal: 16,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  opacity: pressed ? 0.72 : 1,
-                  boxShadow: "0 4px 14px rgba(18, 25, 38, 0.04)"
-                })}
-              >
-                {task.status === "completed" || task.status === "in-progress" ? <CheckMark checked /> : <EmptyCircle />}
-                <Text selectable numberOfLines={1} style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: "600" }}>
-                  {task.title}
-                </Text>
-                <StatusPill status={task.status} />
-              </Pressable>
-            ))}
+            {visibleTasks.length === 0 ? (
+              <Text selectable style={{ color: colors.muted, fontSize: 15 }}>
+                No tasks here yet.
+              </Text>
+            ) : (
+              visibleTasks.map((task: Task) => (
+                <Pressable
+                  accessibilityRole="button"
+                  key={task.id}
+                  onPress={() => router.push(`/task/${task.id}`)}
+                  style={({ pressed }) => ({
+                    minHeight: 62,
+                    borderRadius: radii.md,
+                    borderCurve: "continuous",
+                    borderWidth: 1,
+                    borderColor: colors.line,
+                    backgroundColor: colors.surface,
+                    paddingHorizontal: 16,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    opacity: pressed ? 0.72 : 1,
+                    boxShadow: "0 4px 14px rgba(18, 25, 38, 0.04)"
+                  })}
+                >
+                  {task.status === "completed" ? <CheckMark checked /> : <EmptyCircle />}
+                  <Text selectable numberOfLines={1} style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: "600" }}>
+                    {task.title}
+                  </Text>
+                  <StatusPill status={task.status} />
+                </Pressable>
+              ))
+            )}
           </View>
         ) : (
           <View style={{ gap: 14, flex: 1 }}>
@@ -169,7 +184,7 @@ export default function ProjectScreen() {
           </View>
         )}
 
-        <SoftButton label="Add Task" icon={<Plus size={22} color={colors.violet} strokeWidth={2.2} />} onPress={() => setExtraTask(true)} />
+        <SoftButton label="Add Task" icon={<Plus size={22} color={colors.violet} strokeWidth={2.2} />} onPress={() => router.push("/task-form" as never)} />
       </View>
     </AppShell>
   );

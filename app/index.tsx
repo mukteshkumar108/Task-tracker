@@ -1,11 +1,14 @@
-import { useRouter } from "expo-router";
+import { usePathname, useRouter } from "expo-router";
 import { Check, Circle } from "lucide-react-native";
+import { useEffect } from "react";
 import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { AppShell } from "@/components/ui";
-import { colors, radii } from "@/constants/theme";
+import { useAppState } from "@/contexts/app-state";
 
 function LogoMark() {
+  const { colors } = useAppState();
+
   return (
     <View
       style={{
@@ -47,6 +50,8 @@ function LogoMark() {
 }
 
 function Illustration() {
+  const { colors } = useAppState();
+
   return (
     <View style={{ height: 245, width: "100%", alignItems: "center", justifyContent: "flex-end" }}>
       <View
@@ -116,8 +121,21 @@ function Illustration() {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const pathname = usePathname();
+  const { colors, loading, signIn, user } = useAppState();
   const { width } = useWindowDimensions();
   const buttonWidth = Math.max(260, Math.min(width, 430) - 52);
+
+  useEffect(() => {
+    if (!loading && user && pathname === "/") {
+      router.replace("/home");
+    }
+  }, [loading, pathname, router, user]);
+
+  const enterApp = () => {
+    signIn();
+    router.replace("/home");
+  };
 
   return (
     <AppShell scroll={false}>
@@ -138,7 +156,7 @@ export default function OnboardingScreen() {
         <View style={{ flex: 1 }} />
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push("/home")}
+          onPress={enterApp}
           style={({ pressed }) => ({
             width: buttonWidth,
             height: 58,
@@ -151,16 +169,18 @@ export default function OnboardingScreen() {
           })}
         >
           <Text selectable style={{ color: colors.surface, fontSize: 16, fontWeight: "800" }}>
-            Get Started
+            {loading ? "Loading..." : "Get Started"}
           </Text>
         </Pressable>
         <View style={{ marginTop: 30, flexDirection: "row", gap: 4, alignItems: "center" }}>
           <Text selectable style={{ color: colors.muted, fontSize: 14 }}>
             Already have an account?
           </Text>
-          <Text selectable style={{ color: colors.greenDark, fontSize: 14, fontWeight: "800" }}>
-            Sign in
-          </Text>
+          <Pressable onPress={enterApp}>
+            <Text selectable style={{ color: colors.greenDark, fontSize: 14, fontWeight: "800" }}>
+              Sign in
+            </Text>
+          </Pressable>
         </View>
       </View>
     </AppShell>

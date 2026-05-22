@@ -1,21 +1,19 @@
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { ChevronRight, Circle, Check } from "lucide-react-native";
+import { CalendarDays, ChevronRight, Circle, Check, Home, LayoutList } from "lucide-react-native";
 import type { ComponentType, ReactNode } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
-import { colors, radii } from "@/constants/theme";
-import type { TaskStatus } from "@/data/tasks";
-
-export const shadowSoft = {
-  boxShadow: `0 14px 36px ${colors.shadow}`
-} as const;
+import { radii } from "@/constants/theme";
+import { useAppState } from "@/contexts/app-state";
+import { statusLabel, type TaskStatus } from "@/data/tasks";
 
 export const shadowTiny = {
   boxShadow: "0 4px 14px rgba(18, 25, 38, 0.06)"
 } as const;
 
 export function AppShell({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+  const { colors } = useAppState();
   const { width } = useWindowDimensions();
   const isWide = width >= 700;
   const frameWidth = Math.min(width, 430);
@@ -35,7 +33,7 @@ export function AppShell({ children, scroll = true }: { children: ReactNode; scr
               borderCurve: "continuous",
               marginVertical: 28,
               minHeight: 820,
-              ...shadowSoft
+              boxShadow: `0 14px 36px ${colors.shadow}`
             }
           : null)
       }}
@@ -71,14 +69,17 @@ export function AppShell({ children, scroll = true }: { children: ReactNode; scr
 
 export function IconButton({
   children,
-  onPress
+  onPress,
+  accessibilityLabel
 }: {
   children: ReactNode;
   onPress?: () => void;
+  accessibilityLabel?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={onPress}
       style={({ pressed }) => ({
         width: 40,
@@ -104,6 +105,7 @@ export function SectionHeader({
   actionLabel?: string;
 }) {
   const router = useRouter();
+  const { colors } = useAppState();
 
   return (
     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
@@ -122,9 +124,9 @@ export function SectionHeader({
 }
 
 export function StatusPill({ status }: { status: TaskStatus }) {
-  const tone = status === "completed" ? colors.blue : status === "in-progress" ? colors.green : colors.orange;
-  const bg = status === "completed" ? colors.blueSoft : status === "in-progress" ? colors.greenSoft : colors.orangeSoft;
-  const label = status === "completed" ? "Completed" : status === "in-progress" ? "In Progress" : "Pending";
+  const { colors } = useAppState();
+  const tone = status === "completed" ? colors.blue : status === "in_progress" ? colors.green : colors.orange;
+  const bg = status === "completed" ? colors.blueSoft : status === "in_progress" ? colors.greenSoft : colors.orangeSoft;
 
   return (
     <View
@@ -139,13 +141,15 @@ export function StatusPill({ status }: { status: TaskStatus }) {
       }}
     >
       <Text selectable style={{ color: tone, fontSize: 12, fontWeight: "700" }}>
-        {label}
+        {statusLabel(status)}
       </Text>
     </View>
   );
 }
 
 export function CheckMark({ checked, size = 22 }: { checked: boolean; size?: number }) {
+  const { colors } = useAppState();
+
   return (
     <View
       style={{
@@ -173,6 +177,8 @@ export function PrimaryButton({
   onPress?: () => void;
   icon?: ReactNode;
 }) {
+  const { colors } = useAppState();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -211,6 +217,8 @@ export function SoftButton({
   onPress?: () => void;
   icon?: ReactNode;
 }) {
+  const { colors } = useAppState();
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -239,20 +247,22 @@ export function MetaRow({
   icon: Icon,
   label,
   value,
-  valueColor = colors.text
+  valueColor
 }: {
   icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
   label: string;
   value: string;
   valueColor?: string;
 }) {
+  const { colors } = useAppState();
+
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14, minHeight: 34 }}>
       <Icon size={20} color={colors.ink} strokeWidth={1.9} />
       <Text selectable style={{ flex: 1, color: colors.muted, fontSize: 15 }}>
         {label}
       </Text>
-      <Text selectable style={{ color: valueColor, fontSize: 15, fontWeight: "600", textAlign: "right" }}>
+      <Text selectable style={{ color: valueColor ?? colors.text, fontSize: 15, fontWeight: "600", textAlign: "right" }}>
         {value}
       </Text>
     </View>
@@ -263,17 +273,21 @@ export function RowDisclosure({
   title,
   subtitle,
   href,
-  right
+  right,
+  checked = false
 }: {
   title: string;
   subtitle?: string;
   href: string;
   right?: ReactNode;
+  checked?: boolean;
 }) {
   const router = useRouter();
+  const { colors } = useAppState();
 
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={() => router.push(href as never)}
       style={({ pressed }) => ({
         alignSelf: "stretch",
@@ -292,7 +306,7 @@ export function RowDisclosure({
         ...shadowTiny
       })}
     >
-      <CheckMark checked={title.toLowerCase().includes("design")} />
+      <CheckMark checked={checked} />
       <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
         <Text selectable numberOfLines={1} style={{ color: colors.text, fontSize: 15, fontWeight: "600" }}>
           {title}
@@ -309,5 +323,45 @@ export function RowDisclosure({
 }
 
 export function EmptyCircle() {
-  return <Circle size={22} color="#c3c8d0" strokeWidth={1.7} />;
+  const { colors } = useAppState();
+  return <Circle size={22} color={colors.muted} strokeWidth={1.7} />;
+}
+
+export function BottomNav({ active }: { active: "home" | "calendar" | "tasks" }) {
+  const router = useRouter();
+  const { colors } = useAppState();
+  const items = [
+    { key: "home" as const, label: "Home", icon: Home, href: "/home" },
+    { key: "calendar" as const, label: "Calendar", icon: CalendarDays, href: "/calendar" },
+    { key: "tasks" as const, label: "Tasks", icon: LayoutList, href: "/tasks" }
+  ];
+
+  return (
+    <View
+      style={{
+        height: 80,
+        borderTopWidth: 1,
+        borderTopColor: colors.line,
+        backgroundColor: colors.surface,
+        paddingHorizontal: 22,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-around"
+      }}
+    >
+      {items.map((item) => {
+        const Icon = item.icon;
+        const isActive = active === item.key;
+
+        return (
+          <Pressable key={item.key} onPress={() => router.push(item.href as never)} style={{ alignItems: "center", gap: 6, minWidth: 58 }}>
+            <Icon size={22} color={isActive ? colors.green : colors.muted} strokeWidth={2.2} fill={isActive ? colors.green : "transparent"} />
+            <Text selectable style={{ color: isActive ? colors.greenDark : colors.muted, fontSize: 11, fontWeight: isActive ? "800" : "600" }}>
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
