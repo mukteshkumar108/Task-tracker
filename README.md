@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Task Tracker
 
 An Expo Router task tracker app based on the provided mobile UI reference.
@@ -7,3 +8,9 @@ An Expo Router task tracker app based on the provided mobile UI reference.
 - `npm run web` starts the app for web preview.
 - `npm run start` starts Expo for device preview.
 - `npm run typecheck` runs TypeScript checks.
+=======
+# Task-tracker
+
+### Why JSON?
+Since command-line applications finish their execution immediately after a task is performed, any data stored in variables is lost. To ensure tasks persist between sessions, this tool uses JSON as a lightweight database. This allows the application to map complex Go structures like IDs, timestamps, and task descriptions into a readable text format on your hard drive. This ensures your data is saved and easily retrievable every time you run a command.
+>>>>>>> 90d299fc1cfa473dee51ce78db14e49e767bcb23
