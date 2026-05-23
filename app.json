@@ -10,7 +10,13 @@
     "android": {
       "package": "com.muktesh.tasktracker",
       "permissions": [
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
       ]
     },
     "web": {
@@ -19,7 +25,14 @@
     },
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Task Tracker to choose proof photos from your gallery.",
+          "cameraPermission": "Allow Task Tracker to take Proof of Work photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

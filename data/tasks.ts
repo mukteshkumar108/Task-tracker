@@ -1,9 +1,8 @@
-import { CalendarDays, CheckCircle2, Clock3, FileText, LayoutList, PencilLine, ShieldCheck } from "lucide-react-native";
+import { CalendarDays, Camera, CheckCircle2, Clock3, FileText, LayoutList, PencilLine, ShieldCheck } from "lucide-react-native";
 import type { ComponentType } from "react";
 
 export type TaskStatus = "pending" | "in_progress" | "completed";
-export type TaskPriority = "Low" | "Medium" | "High";
-export type ReminderOption = "none" | "due_time" | "5_minutes" | "10_minutes" | "30_minutes" | "1_hour" | "1_day" | "custom";
+export type ReminderFrequency = "none" | "5_minutes" | "15_minutes" | "30_minutes" | "1_hour" | "custom";
 
 export type Subtask = {
   id: string;
@@ -16,13 +15,18 @@ export type Task = {
   title: string;
   status: TaskStatus;
   dueDate: string;
+  reminderStartTime: string;
   dueTime: string;
-  priority: TaskPriority;
-  category: string;
-  description: string;
-  reminderOption: ReminderOption;
+  reminderFrequency: ReminderFrequency;
+  customReminderMinutes: string | null;
+  area: string | null;
+  notes: string;
   reminderAt: string | null;
   notificationId: string | null;
+  notificationIds: string[];
+  alarmNotificationId: string | null;
+  alarmStoppedAt: string | null;
+  snoozedUntil: string | null;
   subtasks: Subtask[];
   createdAt: string;
   updatedAt: string;
@@ -32,42 +36,74 @@ export type Task = {
 export type TaskInput = {
   title: string;
   dueDate: string;
+  reminderStartTime: string;
   dueTime: string;
-  priority: TaskPriority;
-  category: string;
-  description: string;
-  reminderOption: ReminderOption;
-  reminderAt: string | null;
+  reminderFrequency: ReminderFrequency;
+  customReminderMinutes: string | null;
+  area: string | null;
+  notes: string;
 };
 
-export const priorityOrder: TaskPriority[] = ["Low", "Medium", "High"];
+export type ProofTask = {
+  id: string;
+  title: string;
+  dailySchedule: string;
+  reminderTime: string;
+  area: string | null;
+  description: string;
+  streakCount: number;
+  lastCompletedDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt: string | null;
+};
 
-export const categoryOptions = [
-  "General",
-  "Task Tracker",
-  "Startup",
-  "Work",
-  "Personal",
-  "Study / College",
-  "Money / Finance",
-  "Fitness / Health",
-  "Learning / Skills",
-  "Content / Marketing",
-  "Client Work",
-  "Home / Family",
-  "Website Redesign"
-];
+export type ProofTaskInput = {
+  title: string;
+  dailySchedule: string;
+  reminderTime: string;
+  area: string | null;
+  description: string;
+};
 
-export const reminderOptions: { label: string; value: ReminderOption }[] = [
-  { label: "No reminder", value: "none" },
-  { label: "At due time", value: "due_time" },
-  { label: "5 minutes before", value: "5_minutes" },
-  { label: "10 minutes before", value: "10_minutes" },
-  { label: "30 minutes before", value: "30_minutes" },
-  { label: "1 hour before", value: "1_hour" },
-  { label: "1 day before", value: "1_day" },
+export type ProofEntry = {
+  id: string;
+  proofTaskId: string;
+  title: string;
+  photoUri: string;
+  date: string;
+  time: string;
+  description: string;
+  area: string | null;
+  streakCount: number;
+  createdAt: string;
+  hiddenAt: string | null;
+};
+
+export type ProofCompletionInput = {
+  photoUri: string;
+  description: string;
+};
+
+export const areaOptions = ["Study", "Fitness", "Work", "Business", "Personal", "Health", "Finance", "Custom"];
+
+export const reminderFrequencyOptions: { label: string; value: ReminderFrequency }[] = [
+  { label: "No repeat", value: "none" },
+  { label: "Every 5 minutes", value: "5_minutes" },
+  { label: "Every 15 minutes", value: "15_minutes" },
+  { label: "Every 30 minutes", value: "30_minutes" },
+  { label: "Every 1 hour", value: "1_hour" },
   { label: "Custom", value: "custom" }
 ];
+
+export const frequencyMinutes: Record<ReminderFrequency, number | null> = {
+  none: null,
+  "5_minutes": 5,
+  "15_minutes": 15,
+  "30_minutes": 30,
+  "1_hour": 60,
+  custom: null
+};
 
 export const stats = [
   {
@@ -93,8 +129,9 @@ export const overviewItems: {
   icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 }[] = [
   { label: "Timeline", value: "Active task window", icon: CalendarDays },
-  { label: "Scope", value: "Live user tasks", icon: LayoutList },
-  { label: "Brief", value: "Minimal, focused tracking", icon: FileText },
+  { label: "Scope", value: "Tasks grouped by area", icon: LayoutList },
+  { label: "Memories", value: "Proof of Work photo log", icon: Camera },
+  { label: "Notes", value: "Simple personal tracking", icon: FileText },
   { label: "Design", value: "Today-first workflow", icon: PencilLine }
 ];
 
@@ -181,4 +218,17 @@ export function isActiveTask(task: Task) {
 
 export function completionDateKey(task: Task) {
   return task.completedAt ? todayKey(new Date(task.completedAt)) : null;
+}
+
+export function previousDateKey(dateKey: string) {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() - 1);
+  return todayKey(date);
+}
+
+export function frequencyLabel(value: ReminderFrequency, customMinutes?: string | null) {
+  if (value === "custom") {
+    return customMinutes ? `Every ${customMinutes} min` : "Custom";
+  }
+  return reminderFrequencyOptions.find((option) => option.value === value)?.label ?? "No repeat";
 }

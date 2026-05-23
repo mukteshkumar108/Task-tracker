@@ -1,6 +1,7 @@
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
 
+import { AlarmOverlay } from "@/components/alarm-overlay";
 import { AppStateProvider, useAppState } from "@/contexts/app-state";
 
 export default function RootLayout() {
@@ -25,6 +26,7 @@ function RootStack() {
           }
         }}
       />
+      <AlarmOverlay />
     </>
   );
 }

@@ -1,37 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { CalendarDays, ChevronLeft, Clock3, Edit3, LayoutList, MoreVertical, PencilLine, Plus, Tag, Trash2 } from "lucide-react-native";
+import { Bell, CalendarDays, CheckCircle2, ChevronLeft, Clock3, Edit3, Folder, MoreVertical, PencilLine, Trash2 } from "lucide-react-native";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { AppShell, CheckMark, IconButton, MetaRow, PrimaryButton, StatusPill } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
-import { formatDateLabel } from "@/data/tasks";
+import { formatDateLabel, frequencyLabel, formatTimeFromIso } from "@/data/tasks";
 import { goBackOrReplace } from "@/lib/navigation";
 
 export default function TaskDetailScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const {
-    colors,
-    user,
-    loading,
-    error,
-    clearError,
-    getTask,
-    deleteTask,
-    completeTask,
-    markTaskPending,
-    addSubtask,
-    updateSubtask,
-    toggleSubtask,
-    deleteSubtask
-  } = useAppState();
+  const { colors, user, loading, error, clearError, getTask, deleteTask, completeTask, markTaskPending } = useAppState();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [newSubtask, setNewSubtask] = useState("");
-  const [editingSubtask, setEditingSubtask] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
   const contentWidth = Math.max(300, Math.min(width, 430) - 48);
   const task = id ? getTask(id) : undefined;
   const iconTone = task?.status === "completed" ? colors.blue : task?.status === "pending" ? colors.orange : colors.green;
@@ -50,23 +33,6 @@ export default function TaskDetailScreen() {
     await deleteTask(task.id);
     setMenuOpen(false);
     router.replace("/home");
-  };
-
-  const handleAddSubtask = async () => {
-    if (!task) {
-      return;
-    }
-    await addSubtask(task.id, newSubtask);
-    setNewSubtask("");
-  };
-
-  const handleSaveSubtask = async (subtaskId: string) => {
-    if (!task) {
-      return;
-    }
-    await updateSubtask(task.id, subtaskId, editingTitle);
-    setEditingSubtask(null);
-    setEditingTitle("");
   };
 
   if (loading) {
@@ -119,7 +85,7 @@ export default function TaskDetailScreen() {
               top: 78,
               right: 24,
               zIndex: 3,
-              width: 206,
+              width: 220,
               borderRadius: radii.md,
               borderCurve: "continuous",
               borderWidth: 1,
@@ -127,7 +93,7 @@ export default function TaskDetailScreen() {
               backgroundColor: colors.surface,
               padding: 8,
               gap: 4,
-              boxShadow: `0 12px 28px ${colors.shadow}`
+              boxShadow: `0 12px 28px ${colors.shadow}`,
             }}
           >
             <Pressable
@@ -152,6 +118,7 @@ export default function TaskDetailScreen() {
                   await markTaskPending(task.id);
                 } else {
                   await completeTask(task.id);
+                  router.replace("/home");
                 }
                 setMenuOpen(false);
               }}
@@ -193,7 +160,7 @@ export default function TaskDetailScreen() {
               borderCurve: "continuous",
               backgroundColor: iconBg,
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             <PencilLine size={47} color={iconTone} strokeWidth={2.3} />
@@ -210,150 +177,32 @@ export default function TaskDetailScreen() {
         </View>
 
         <View style={{ gap: 16 }}>
-          <MetaRow icon={CalendarDays} label="Due Date" value={formatDateLabel(task.dueDate)} />
-          <MetaRow icon={Clock3} label="Due Time" value={task.dueTime} />
-          <MetaRow icon={Tag} label="Priority" value={task.priority} valueColor={task.priority === "High" ? colors.red : colors.greenDark} />
-          <MetaRow icon={LayoutList} label="Category / Project" value={task.category} />
+          <MetaRow icon={CalendarDays} label="Date" value={formatDateLabel(task.dueDate)} />
+          <MetaRow icon={Bell} label="Reminder starts" value={task.reminderStartTime} />
+          <MetaRow icon={Clock3} label="Due alarm" value={task.dueTime} />
+          <MetaRow icon={Bell} label="Repeat" value={frequencyLabel(task.reminderFrequency, task.customReminderMinutes)} />
+          <MetaRow icon={Folder} label="Area" value={task.area || "None"} />
         </View>
 
         <View style={{ height: 1, backgroundColor: colors.line }} />
 
         <View style={{ gap: 12 }}>
           <Text selectable style={{ color: colors.ink, fontSize: 16, fontWeight: "900" }}>
-            Description
+            Notes
           </Text>
           <Text selectable style={{ color: colors.muted, fontSize: 15, lineHeight: 22 }}>
-            {task.description || "No description yet."}
+            {task.notes || "No notes yet."}
           </Text>
         </View>
 
-        <View style={{ height: 1, backgroundColor: colors.line }} />
+        {task.completedAt ? (
+          <>
+            <View style={{ height: 1, backgroundColor: colors.line }} />
+            <MetaRow icon={CheckCircle2} label="Completed" value={formatTimeFromIso(task.completedAt)} valueColor={colors.blue} />
+          </>
+        ) : null}
 
-        <View style={{ gap: 12 }}>
-          <Text selectable style={{ color: colors.ink, fontSize: 16, fontWeight: "900" }}>
-            Subtasks
-          </Text>
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: colors.line,
-              borderRadius: radii.md,
-              borderCurve: "continuous",
-              overflow: "hidden",
-              backgroundColor: colors.surface
-            }}
-          >
-            {task.subtasks.length === 0 ? (
-              <View style={{ minHeight: 48, paddingHorizontal: 17, justifyContent: "center" }}>
-                <Text selectable style={{ color: colors.muted, fontSize: 14 }}>
-                  No subtasks yet.
-                </Text>
-              </View>
-            ) : (
-              task.subtasks.map((subtask, index) => {
-                const isEditing = editingSubtask === subtask.id;
-                return (
-                  <View
-                    key={subtask.id}
-                    style={{
-                      minHeight: 48,
-                      paddingHorizontal: 17,
-                      paddingVertical: 8,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      borderBottomWidth: index === task.subtasks.length - 1 ? 0 : 1,
-                      borderBottomColor: colors.line
-                    }}
-                  >
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: subtask.completed }}
-                      accessibilityLabel={`Toggle subtask ${subtask.title}`}
-                      onPress={() => toggleSubtask(task.id, subtask.id)}
-                    >
-                      <CheckMark checked={subtask.completed} size={20} />
-                    </Pressable>
-                    {isEditing ? (
-                      <TextInput
-                        value={editingTitle}
-                        onChangeText={setEditingTitle}
-                        autoFocus
-                        style={{
-                          flex: 1,
-                          minHeight: 38,
-                          color: colors.text,
-                          borderWidth: 1,
-                          borderColor: colors.line,
-                          borderRadius: radii.sm,
-                          paddingHorizontal: 10
-                        }}
-                      />
-                    ) : (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit subtask ${subtask.title}`}
-                        onPress={() => {
-                          setEditingSubtask(subtask.id);
-                          setEditingTitle(subtask.title);
-                        }}
-                        style={{ flex: 1 }}
-                      >
-                        <Text selectable style={{ color: colors.text, fontSize: 14, fontWeight: "600" }}>
-                          {subtask.title}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {isEditing ? (
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Save subtask ${subtask.title}`} onPress={() => handleSaveSubtask(subtask.id)}>
-                        <Text selectable style={{ color: colors.greenDark, fontSize: 13, fontWeight: "900" }}>
-                          Save
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Delete subtask ${subtask.title}`} onPress={() => deleteSubtask(task.id, subtask.id)}>
-                      <Trash2 size={17} color={colors.muted} />
-                    </Pressable>
-                  </View>
-                );
-              })
-            )}
-          </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <TextInput
-              value={newSubtask}
-              onChangeText={setNewSubtask}
-              placeholder="Add subtask"
-              placeholderTextColor={colors.muted}
-              style={{
-                flex: 1,
-                height: 46,
-                borderRadius: radii.sm,
-                borderCurve: "continuous",
-                borderWidth: 1,
-                borderColor: colors.line,
-                color: colors.text,
-                paddingHorizontal: 14
-              }}
-            />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Add subtask"
-              onPress={handleAddSubtask}
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 14,
-                borderCurve: "continuous",
-                backgroundColor: colors.green,
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
-              <Plus size={22} color={colors.surface} />
-            </Pressable>
-          </View>
-        </View>
+        <View style={{ flex: 1 }} />
 
         {task.status === "completed" ? (
           <View
@@ -363,7 +212,7 @@ export default function TaskDetailScreen() {
               borderCurve: "continuous",
               backgroundColor: colors.blueSoft,
               alignItems: "center",
-              justifyContent: "center"
+              justifyContent: "center",
             }}
           >
             <Text selectable style={{ color: colors.blue, fontSize: 16, fontWeight: "900" }}>

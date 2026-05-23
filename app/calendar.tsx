@@ -1,48 +1,14 @@
 import { useRouter } from "expo-router";
-import { CalendarDays, ChevronDown, Plus } from "lucide-react-native";
+import { CalendarDays, Camera, ChevronDown, Clock3, Plus } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Image, Pressable, Text, View, useWindowDimensions } from "react-native";
 
 import { AppShell, BottomNav, CheckMark, EmptyCircle, IconButton } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
-import { formatDateLabel, formatMonthTitle, parseDateKey, todayKey, type Task, type TaskPriority } from "@/data/tasks";
+import { formatDateLabel, formatMonthTitle, formatTimeFromIso, parseDateKey, todayKey, type ProofEntry, type Task } from "@/data/tasks";
 
 const weekDays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-
-function priorityColor(priority: TaskPriority, colors: ReturnType<typeof useAppState>["colors"]) {
-  if (priority === "High") {
-    return colors.violet;
-  }
-  if (priority === "Medium") {
-    return colors.orange;
-  }
-  return colors.blue;
-}
-
-function PriorityBadge({ priority }: { priority: TaskPriority }) {
-  const { colors } = useAppState();
-  const color = priorityColor(priority, colors);
-  const background = priority === "High" ? colors.violetSoft : priority === "Medium" ? colors.orangeSoft : colors.blueSoft;
-
-  return (
-    <View
-      style={{
-        minWidth: 56,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: radii.sm,
-        borderCurve: "continuous",
-        backgroundColor: background,
-        alignItems: "center"
-      }}
-    >
-      <Text selectable style={{ color, fontSize: 12, fontWeight: "800" }}>
-        {priority}
-      </Text>
-    </View>
-  );
-}
 
 function buildMonthCells(monthDate: Date) {
   const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
@@ -56,15 +22,120 @@ function buildMonthCells(monthDate: Date) {
   });
 }
 
+function TaskTimelineCard({ task }: { task: Task }) {
+  const router = useRouter();
+  const { colors } = useAppState();
+  const completed = task.status === "completed";
+
+  return (
+    <Pressable
+      onPress={() => router.push(`/task/${task.id}`)}
+      style={({ pressed }) => ({
+        minHeight: 66,
+        borderRadius: radii.md,
+        borderCurve: "continuous",
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.surface,
+        paddingHorizontal: 16,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        opacity: pressed ? 0.72 : 1,
+      })}
+    >
+      {completed ? <CheckMark checked /> : <EmptyCircle />}
+      <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
+        <Text selectable numberOfLines={1} style={{ color: completed ? colors.muted : colors.text, fontSize: 15, fontWeight: "700" }}>
+          {task.title}
+        </Text>
+        <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
+          {completed && task.completedAt ? `Completed ${formatTimeFromIso(task.completedAt)}` : `Due ${task.dueTime}`}
+        </Text>
+      </View>
+      <View
+        style={{
+          minWidth: 58,
+          paddingHorizontal: 10,
+          paddingVertical: 7,
+          borderRadius: radii.sm,
+          borderCurve: "continuous",
+          backgroundColor: completed ? colors.greenSoft : colors.orangeSoft,
+          alignItems: "center",
+        }}
+      >
+        <Text selectable style={{ color: completed ? colors.greenDark : colors.orange, fontSize: 12, fontWeight: "800" }}>
+          {completed ? "Done" : "Open"}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function ProofMemoryCard({ entry }: { entry: ProofEntry }) {
+  const { colors } = useAppState();
+
+  return (
+    <View
+      style={{
+        borderRadius: radii.md,
+        borderCurve: "continuous",
+        borderWidth: 1,
+        borderColor: colors.line,
+        backgroundColor: colors.surface,
+        padding: 12,
+        flexDirection: "row",
+        gap: 12,
+      }}
+    >
+      <Image source={{ uri: entry.photoUri }} style={{ width: 68, height: 68, borderRadius: 14, backgroundColor: colors.faint }} />
+      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+          <Camera size={16} color={colors.greenDark} strokeWidth={2.2} />
+          <Text selectable numberOfLines={1} style={{ flex: 1, color: colors.ink, fontSize: 15, fontWeight: "900" }}>
+            {entry.title}
+          </Text>
+        </View>
+        <Text selectable style={{ color: colors.greenDark, fontSize: 12, fontWeight: "800" }}>
+          Streak: {entry.streakCount} day{entry.streakCount === 1 ? "" : "s"}
+        </Text>
+        <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
+          Completed at {entry.time}
+        </Text>
+        {entry.description ? (
+          <Text selectable numberOfLines={2} style={{ color: colors.text, fontSize: 13, lineHeight: 18 }}>
+            {entry.description}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export default function CalendarScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { colors, user, loading, tasks, getTasksForDate } = useAppState();
+  const {
+    colors,
+    user,
+    loading,
+    tasks,
+    proofEntries,
+    proofTasks,
+    getTasksForDate,
+    getProofEntriesForDate,
+    getMissedProofTasksForDate,
+    getPendingProofTasksForDate,
+  } = useAppState();
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [visibleMonth, setVisibleMonth] = useState(parseDateKey(todayKey()));
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
   const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
   const selectedTasks = getTasksForDate(selectedDate);
+  const selectedProofEntries = getProofEntriesForDate(selectedDate);
+  const selectedMissedProofTasks = getMissedProofTasksForDate(selectedDate);
+  const selectedPendingProofTasks = getPendingProofTasksForDate(selectedDate).filter((task) => selectedDate === todayKey());
+  const selectedCount = selectedTasks.length + selectedProofEntries.length + selectedMissedProofTasks.length + selectedPendingProofTasks.length;
   const tasksByDate = useMemo(() => {
     const grouped = new Map<string, Task[]>();
     tasks.forEach((task) => {
@@ -74,6 +145,15 @@ export default function CalendarScreen() {
     });
     return grouped;
   }, [tasks]);
+  const proofsByDate = useMemo(() => {
+    const grouped = new Map<string, ProofEntry[]>();
+    proofEntries.forEach((entry) => {
+      const group = grouped.get(entry.date) ?? [];
+      group.push(entry);
+      grouped.set(entry.date, group);
+    });
+    return grouped;
+  }, [proofEntries]);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -87,10 +167,7 @@ export default function CalendarScreen() {
         <View style={{ width: contentWidth, alignSelf: "center", gap: 24, flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View style={{ width: 40, height: 40 }} />
-            <Pressable
-              onPress={() => setVisibleMonth(parseDateKey(todayKey()))}
-              style={{ flexDirection: "row", alignItems: "center", gap: 7 }}
-            >
+            <Pressable onPress={() => setVisibleMonth(parseDateKey(todayKey()))} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
               <Text selectable style={{ color: colors.ink, fontSize: 18, fontWeight: "900" }}>
                 {formatMonthTitle(visibleMonth)}
               </Text>
@@ -115,7 +192,17 @@ export default function CalendarScreen() {
                 const isSelected = dateKey === selectedDate;
                 const isCurrentMonth = date.getMonth() === visibleMonth.getMonth();
                 const dayTasks = tasksByDate.get(dateKey) ?? [];
-                const dotTasks = dayTasks.slice(0, 3);
+                const dayProofs = proofsByDate.get(dateKey) ?? [];
+                const missedProofCount =
+                  dateKey < todayKey()
+                    ? proofTasks.filter((task) => {
+                        const createdDate = todayKey(new Date(task.createdAt));
+                        const archivedDate = task.archivedAt ? todayKey(new Date(task.archivedAt)) : null;
+                        return createdDate <= dateKey && (!archivedDate || archivedDate > dateKey) && !dayProofs.some((entry) => entry.proofTaskId === task.id);
+                      }).length
+                    : 0;
+                const hasCompleted = dayProofs.length > 0 || dayTasks.some((task) => task.status === "completed");
+                const hasActiveTasks = dayTasks.some((task) => task.status !== "completed");
 
                 return (
                   <Pressable
@@ -133,7 +220,7 @@ export default function CalendarScreen() {
                         borderRadius: 21,
                         backgroundColor: isSelected ? colors.green : "transparent",
                         alignItems: "center",
-                        justifyContent: "center"
+                        justifyContent: "center",
                       }}
                     >
                       <Text
@@ -141,24 +228,16 @@ export default function CalendarScreen() {
                         style={{
                           color: isSelected ? colors.surface : isCurrentMonth ? colors.ink : colors.muted,
                           fontSize: 15,
-                          fontWeight: isSelected ? "900" : "600"
+                          fontWeight: isSelected ? "900" : "600",
                         }}
                       >
                         {date.getDate()}
                       </Text>
                     </View>
-                    <View style={{ height: 4, flexDirection: "row", gap: 4 }}>
-                      {dotTasks.map((task) => (
-                        <View
-                          key={task.id}
-                          style={{
-                            width: 4,
-                            height: 4,
-                            borderRadius: 2,
-                            backgroundColor: task.status === "completed" ? colors.green : priorityColor(task.priority, colors)
-                          }}
-                        />
-                      ))}
+                    <View style={{ height: 5, flexDirection: "row", gap: 4 }}>
+                      {hasCompleted ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green }} /> : null}
+                      {missedProofCount > 0 ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.red }} /> : null}
+                      {hasActiveTasks ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.orange }} /> : null}
                     </View>
                   </Pressable>
                 );
@@ -177,60 +256,89 @@ export default function CalendarScreen() {
               backgroundColor: colors.surface,
               borderTopWidth: 1,
               borderColor: colors.line,
-              gap: 16
+              gap: 16,
             }}
           >
             <View style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: colors.line, alignSelf: "center" }} />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900" }}>
-                Tasks for {formatDateLabel(selectedDate)}
+                {formatDateLabel(selectedDate)}
               </Text>
               <Text selectable style={{ color: colors.muted, fontSize: 14, fontWeight: "700" }}>
-                {selectedTasks.length} {selectedTasks.length === 1 ? "task" : "tasks"}
+                {selectedCount} item{selectedCount === 1 ? "" : "s"}
               </Text>
             </View>
 
-            {selectedTasks.length === 0 ? (
-              <View style={{ minHeight: 112, borderRadius: radii.md, borderCurve: "continuous", borderWidth: 1, borderColor: colors.line, alignItems: "center", justifyContent: "center", padding: 18 }}>
+            {selectedCount === 0 ? (
+              <View
+                style={{
+                  minHeight: 112,
+                  borderRadius: radii.md,
+                  borderCurve: "continuous",
+                  borderWidth: 1,
+                  borderColor: colors.line,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 18,
+                }}
+              >
                 <Text selectable style={{ color: colors.ink, fontSize: 16, fontWeight: "900" }}>
-                  No tasks on this date
+                  No memories on this date
                 </Text>
-                <Text selectable style={{ color: colors.muted, fontSize: 13, marginTop: 5 }}>
-                  Add one from the green button.
+                <Text selectable style={{ color: colors.muted, fontSize: 13, marginTop: 5, textAlign: "center" }}>
+                  Add a task or complete a Proof of Work.
                 </Text>
               </View>
             ) : (
               <View style={{ gap: 12 }}>
-                {selectedTasks.map((task) => (
-                  <Pressable
-                    key={task.id}
-                    onPress={() => router.push(`/task/${task.id}`)}
-                    style={({ pressed }) => ({
-                      minHeight: 66,
-                      borderRadius: radii.md,
-                      borderCurve: "continuous",
-                      borderWidth: 1,
-                      borderColor: colors.line,
-                      backgroundColor: colors.surface,
-                      paddingHorizontal: 16,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 12,
-                      opacity: pressed ? 0.72 : 1
-                    })}
-                  >
-                    {task.status === "completed" ? <CheckMark checked /> : <EmptyCircle />}
-                    <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
-                      <Text selectable numberOfLines={1} style={{ color: task.status === "completed" ? colors.muted : colors.text, fontSize: 15, fontWeight: "700" }}>
-                        {task.title}
-                      </Text>
-                      <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
-                        {task.dueTime}
-                      </Text>
-                    </View>
-                    <PriorityBadge priority={task.priority} />
-                  </Pressable>
+                {selectedProofEntries.map((entry) => (
+                  <ProofMemoryCard key={entry.id} entry={entry} />
                 ))}
+
+                {selectedTasks.map((task) => (
+                  <TaskTimelineCard key={task.id} task={task} />
+                ))}
+
+                {[...selectedPendingProofTasks, ...selectedMissedProofTasks].map((task) => {
+                  const missed = selectedMissedProofTasks.some((item) => item.id === task.id);
+
+                  return (
+                    <View
+                      key={`${missed ? "missed" : "pending"}-${task.id}`}
+                      style={{
+                        minHeight: 66,
+                        borderRadius: radii.md,
+                        borderCurve: "continuous",
+                        borderWidth: 1,
+                        borderColor: colors.line,
+                        backgroundColor: colors.surface,
+                        paddingHorizontal: 16,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          borderWidth: 1.5,
+                          borderColor: missed ? colors.red : colors.orange,
+                        }}
+                      />
+                      <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
+                        <Text selectable numberOfLines={1} style={{ color: colors.text, fontSize: 15, fontWeight: "700" }}>
+                          {task.title}
+                        </Text>
+                        <Text selectable style={{ color: missed ? colors.red : colors.orange, fontSize: 12, fontWeight: "800" }}>
+                          {missed ? "Missed Proof of Work" : "Proof pending today"}
+                        </Text>
+                      </View>
+                      <Clock3 size={19} color={missed ? colors.red : colors.orange} strokeWidth={2.1} />
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -251,7 +359,7 @@ export default function CalendarScreen() {
             alignItems: "center",
             justifyContent: "center",
             opacity: pressed ? 0.78 : 1,
-            boxShadow: "0 12px 25px rgba(33, 147, 95, 0.30)"
+            boxShadow: "0 12px 25px rgba(33, 147, 95, 0.30)",
           })}
         >
           <Plus size={31} color={colors.surface} strokeWidth={2.2} />

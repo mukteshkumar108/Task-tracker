@@ -1,12 +1,11 @@
 import { useRouter } from "expo-router";
 import {
-  Archive,
   Bell,
   CalendarDays,
+  Camera,
   CheckCircle2,
   CircleHelp,
-  Flag,
-  Folder,
+  Clock3,
   Home,
   Info,
   LogOut,
@@ -23,7 +22,7 @@ import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } fro
 import { AppShell, BottomNav, IconButton, RowDisclosure, SectionHeader, shadowTiny } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
-import { stats, type TaskPriority } from "@/data/tasks";
+import { stats } from "@/data/tasks";
 
 function StatCard({ item, value }: { item: (typeof stats)[number]; value: number }) {
   const { colors } = useAppState();
@@ -59,16 +58,6 @@ function StatCard({ item, value }: { item: (typeof stats)[number]; value: number
       </View>
     </View>
   );
-}
-
-function priorityFlagColor(priority: TaskPriority, colors: ReturnType<typeof useAppState>["colors"]) {
-  if (priority === "High") {
-    return colors.red;
-  }
-  if (priority === "Medium") {
-    return colors.green;
-  }
-  return colors.blue;
 }
 
 function DrawerItem({
@@ -119,17 +108,13 @@ function DrawerMenu({ onClose }: { onClose: () => void }) {
   const { colors, themeMode, toggleTheme, user, updateUserName, signOut } = useAppState();
   const router = useRouter();
   const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState(user?.name ?? "Alex");
+  const [draftName, setDraftName] = useState(user?.name ?? "Muktesh");
   const firstInitial = (user?.name?.trim()?.[0] ?? "A").toUpperCase();
   const menuItems = [
     { label: "Home", icon: Home, href: "/home", active: true },
     { label: "Calendar", icon: CalendarDays, href: "/calendar" },
-    { label: "All Tasks", icon: CheckCircle2, href: "/project/all" },
-    { label: "Categories", icon: Folder, href: "/project/all" },
-    { label: "Priorities", icon: Flag, href: "/project/all" },
-    { label: "Reminders", icon: Bell, href: "/project/all" },
-    { label: "Completed", icon: CheckCircle2, href: "/tasks" },
-    { label: "Archive", icon: Archive, href: "/tasks" }
+    { label: "Proof of Work", icon: Camera, href: "/proof-of-work" },
+    { label: "Task History / Memories", icon: CheckCircle2, href: "/tasks" }
   ] as const;
   const secondaryItems = [
     {
@@ -225,7 +210,7 @@ function DrawerMenu({ onClose }: { onClose: () => void }) {
               />
             ) : (
               <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 21, fontWeight: "900" }}>
-                {user?.name ?? "Alex"}
+                {user?.name ?? "Muktesh"}
               </Text>
             )}
             <Pressable
@@ -277,7 +262,7 @@ function DrawerMenu({ onClose }: { onClose: () => void }) {
           <View style={{ height: 1, backgroundColor: colors.line, marginHorizontal: 18 }} />
 
           <DrawerItem
-            label="Log out"
+            label="Logout"
             icon={LogOut}
             destructive
             onPress={() => {
@@ -298,8 +283,9 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const { colors, user, loading, error, todayTasks, todayCounts, clearError } = useAppState();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [clock, setClock] = useState(new Date());
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
-  const greeting = new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 18 ? "Good afternoon" : "Good evening";
+  const greeting = clock.getHours() < 12 ? "Good morning" : clock.getHours() < 18 ? "Good afternoon" : "Good night";
   const counterValues = [todayCounts.total, todayCounts.completed, todayCounts.pending];
 
   useEffect(() => {
@@ -307,6 +293,11 @@ export default function HomeScreen() {
       router.replace("/");
     }
   }, [loading, router, user]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <AppShell scroll={false}>
@@ -319,7 +310,7 @@ export default function HomeScreen() {
             <Text selectable style={{ color: colors.ink, fontSize: 18, fontWeight: "900" }}>
               Today
             </Text>
-            <IconButton accessibilityLabel="Notifications">
+            <IconButton accessibilityLabel="Notifications" onPress={() => router.push("/notifications" as never)}>
               <Bell size={24} color={colors.ink} strokeWidth={2} />
             </IconButton>
           </View>
@@ -348,7 +339,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={{ gap: 14, flex: 1 }}>
-            <SectionHeader title="Today's Tasks" actionHref="/project/all" actionLabel="View all" />
+            <SectionHeader title="Today's Tasks" actionHref="/tasks" actionLabel="View all" />
             <View style={{ gap: 12 }}>
               {loading ? (
                 <Text selectable style={{ color: colors.muted, fontSize: 15 }}>
@@ -383,7 +374,7 @@ export default function HomeScreen() {
                     title={task.title}
                     subtitle={task.dueTime}
                     checked={false}
-                    right={<Flag size={19} color={priorityFlagColor(task.priority, colors)} strokeWidth={2.1} />}
+                    right={<Clock3 size={19} color={colors.green} strokeWidth={2.1} />}
                   />
                 ))
               )}

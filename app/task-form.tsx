@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter, type Href } from "expo-router";
-import { Bell, CalendarDays, Check, ChevronDown, ChevronLeft, Clock3, Edit3, FileText, Folder, Tag } from "lucide-react-native";
+import { Bell, CalendarDays, Check, ChevronDown, ChevronLeft, Clock3, Edit3, FileText, Folder } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -7,39 +7,21 @@ import { Pressable, Text, TextInput, View, useWindowDimensions } from "react-nat
 import { AppShell, IconButton, PrimaryButton } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
-import { categoryOptions, priorityOrder, reminderOptions, todayKey, type ReminderOption, type TaskInput } from "@/data/tasks";
+import { areaOptions, frequencyLabel, reminderFrequencyOptions, todayKey, type ReminderFrequency, type TaskInput } from "@/data/tasks";
 import { goBackOrReplace } from "@/lib/navigation";
 
 const blankTask: TaskInput = {
   title: "",
   dueDate: todayKey(),
-  dueTime: "9:00 AM",
-  priority: "Medium",
-  category: "General",
-  description: "",
-  reminderOption: "none",
-  reminderAt: null
+  reminderStartTime: "9:00 AM",
+  dueTime: "8:00 PM",
+  reminderFrequency: "1_hour",
+  customReminderMinutes: null,
+  area: null,
+  notes: "",
 };
 
-function formatReminderAtForInput(value?: string | null) {
-  if (!value) {
-    return "";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  const period = date.getHours() >= 12 ? "PM" : "AM";
-  const hour = date.getHours() % 12 || 12;
-  const minute = `${date.getMinutes()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day} ${hour}:${minute} ${period}`;
-}
+const standardAreaOptions = areaOptions.filter((area) => area !== "Custom");
 
 function Field({
   icon,
@@ -47,7 +29,7 @@ function Field({
   value,
   onChangeText,
   multiline = false,
-  placeholder
+  placeholder,
 }: {
   icon: ReactNode;
   label: string;
@@ -84,7 +66,7 @@ function Field({
           paddingHorizontal: 14,
           paddingVertical: multiline ? 14 : 0,
           fontSize: 15,
-          lineHeight: 22
+          lineHeight: 22,
         }}
       />
     </View>
@@ -99,7 +81,7 @@ function SelectField({
   options,
   open,
   onToggle,
-  onSelect
+  onSelect,
 }: {
   icon: ReactNode;
   label: string;
@@ -135,7 +117,7 @@ function SelectField({
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
-          opacity: pressed ? 0.72 : 1
+          opacity: pressed ? 0.72 : 1,
         })}
       >
         <Text selectable numberOfLines={1} style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: "700" }}>
@@ -152,7 +134,7 @@ function SelectField({
             borderWidth: 1,
             borderColor: colors.line,
             backgroundColor: colors.surface,
-            overflow: "hidden"
+            overflow: "hidden",
           }}
         >
           {options.map((option, index) => {
@@ -172,7 +154,7 @@ function SelectField({
                   borderBottomWidth: index === options.length - 1 ? 0 : 1,
                   borderBottomColor: colors.line,
                   backgroundColor: active ? colors.greenSoft : colors.surface,
-                  opacity: pressed ? 0.72 : 1
+                  opacity: pressed ? 0.72 : 1,
                 })}
               >
                 <Text selectable numberOfLines={1} style={{ flex: 1, color: active ? colors.greenDark : colors.text, fontSize: 14, fontWeight: "800" }}>
@@ -195,16 +177,21 @@ export default function TaskFormScreen() {
   const { colors, user, loading, error, clearError, getTask, addTask, updateTask } = useAppState();
   const [form, setForm] = useState<TaskInput>(blankTask);
   const [saving, setSaving] = useState(false);
-  const [categoryOpen, setCategoryOpen] = useState(false);
-  const [reminderOpen, setReminderOpen] = useState(false);
-  const [customCategory, setCustomCategory] = useState("");
+  const [areaOpen, setAreaOpen] = useState(false);
+  const [frequencyOpen, setFrequencyOpen] = useState(false);
+  const [customArea, setCustomArea] = useState("");
   const contentWidth = Math.max(300, Math.min(width, 430) - 48);
   const task = id ? getTask(id) : undefined;
   const isEditing = Boolean(id);
   const backFallback: Href = task ? (`/task/${task.id}` as `/task/${string}`) : dueDate ? "/calendar" : "/home";
-  const categoryIsCustom = !categoryOptions.includes(form.category);
-  const categoryChoices = [...categoryOptions.map((category) => ({ label: category, value: category })), { label: "Custom category...", value: "__custom" }];
-  const reminderLabel = reminderOptions.find((option) => option.value === form.reminderOption)?.label ?? "No reminder";
+  const areaIsCustom = Boolean(form.area && !standardAreaOptions.includes(form.area));
+  const selectedAreaValue = form.area ? (areaIsCustom ? "__custom" : form.area) : "__none";
+  const areaChoices = [
+    { label: "No area", value: "__none" },
+    ...standardAreaOptions.map((area) => ({ label: area, value: area })),
+    { label: "Custom", value: "__custom" },
+  ];
+  const frequencyLabelText = frequencyLabel(form.reminderFrequency, form.customReminderMinutes);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -214,20 +201,19 @@ export default function TaskFormScreen() {
 
   useEffect(() => {
     if (task) {
-      const category = task.category || "General";
       setForm({
         title: task.title,
         dueDate: task.dueDate,
+        reminderStartTime: task.reminderStartTime,
         dueTime: task.dueTime,
-        priority: task.priority,
-        category,
-        description: task.description,
-        reminderOption: task.reminderOption ?? "none",
-        reminderAt: task.reminderOption === "custom" ? formatReminderAtForInput(task.reminderAt) : task.reminderAt
+        reminderFrequency: task.reminderFrequency,
+        customReminderMinutes: task.customReminderMinutes,
+        area: task.area,
+        notes: task.notes,
       });
-      setCustomCategory(categoryOptions.includes(category) ? "" : category);
+      setCustomArea(task.area && !standardAreaOptions.includes(task.area) ? task.area : "");
     } else if (!id && typeof dueDate === "string") {
-      setForm((current) => ({ ...current, dueDate }));
+      setForm((current) => ({ ...blankTask, ...current, dueDate }));
     }
   }, [dueDate, id, task]);
 
@@ -235,32 +221,37 @@ export default function TaskFormScreen() {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const handleCategorySelect = (value: string) => {
-    setCategoryOpen(false);
+  const handleAreaSelect = (value: string) => {
+    setAreaOpen(false);
+    if (value === "__none") {
+      setCustomArea("");
+      updateField("area", null);
+      return;
+    }
     if (value === "__custom") {
-      updateField("category", customCategory || "");
+      updateField("area", customArea || "");
       return;
     }
 
-    setCustomCategory("");
-    updateField("category", value);
+    setCustomArea("");
+    updateField("area", value);
   };
 
-  const handleReminderSelect = (value: string) => {
-    setReminderOpen(false);
-    updateField("reminderOption", value as ReminderOption);
+  const handleFrequencySelect = (value: string) => {
+    setFrequencyOpen(false);
+    updateField("reminderFrequency", value as ReminderFrequency);
     if (value !== "custom") {
-      updateField("reminderAt", null);
+      updateField("customReminderMinutes", null);
     }
   };
 
   const saveTask = async () => {
     setSaving(true);
     try {
-      const taskInput = {
+      const taskInput: TaskInput = {
         ...form,
-        category: form.category.trim() || "General",
-        reminderAt: form.reminderOption === "custom" ? form.reminderAt : null
+        area: form.area?.trim() || null,
+        customReminderMinutes: form.reminderFrequency === "custom" ? form.customReminderMinutes?.trim() || null : null,
       };
 
       if (task) {
@@ -312,116 +303,89 @@ export default function TaskFormScreen() {
               label="Task title"
               value={form.title}
               onChangeText={(value) => updateField("title", value)}
-              placeholder="Design landing page"
+              placeholder="Study DSA"
             />
 
             <Field
               icon={<CalendarDays size={18} color={colors.ink} strokeWidth={2} />}
-              label="Due date"
+              label="Date"
               value={form.dueDate}
               onChangeText={(value) => updateField("dueDate", value)}
               placeholder="YYYY-MM-DD"
             />
 
             <Field
-              icon={<Clock3 size={18} color={colors.ink} strokeWidth={2} />}
-              label="Due Time"
-              value={form.dueTime}
-              onChangeText={(value) => updateField("dueTime", value)}
+              icon={<Bell size={18} color={colors.ink} strokeWidth={2} />}
+              label="Reminder start time"
+              value={form.reminderStartTime}
+              onChangeText={(value) => updateField("reminderStartTime", value)}
               placeholder="9:00 AM"
             />
 
-            <View style={{ gap: 9 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 9 }}>
-                <Tag size={18} color={colors.ink} strokeWidth={2} />
-                <Text selectable style={{ color: colors.ink, fontSize: 14, fontWeight: "900" }}>
-                  Priority
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                {priorityOrder.map((priority) => {
-                  const active = form.priority === priority;
-                  return (
-                    <Pressable
-                      key={priority}
-                      onPress={() => updateField("priority", priority)}
-                      style={{
-                        flex: 1,
-                        height: 46,
-                        borderRadius: radii.sm,
-                        borderCurve: "continuous",
-                        backgroundColor: active ? colors.greenSoft : colors.surface,
-                        borderWidth: 1,
-                        borderColor: active ? colors.green : colors.line,
-                        alignItems: "center",
-                        justifyContent: "center"
-                      }}
-                    >
-                      <Text selectable style={{ color: active ? colors.greenDark : colors.muted, fontWeight: "900", fontSize: 13 }}>
-                        {priority}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-
-            <SelectField
-              icon={<Folder size={18} color={colors.ink} strokeWidth={2} />}
-              label="Category / Project"
-              valueLabel={categoryIsCustom ? form.category || "Custom category" : form.category}
-              selectedValue={categoryIsCustom ? "__custom" : form.category}
-              options={categoryChoices}
-              open={categoryOpen}
-              onToggle={() => {
-                setCategoryOpen((open) => !open);
-                setReminderOpen(false);
-              }}
-              onSelect={handleCategorySelect}
+            <Field
+              icon={<Clock3 size={18} color={colors.ink} strokeWidth={2} />}
+              label="Due time / alarm time"
+              value={form.dueTime}
+              onChangeText={(value) => updateField("dueTime", value)}
+              placeholder="8:00 PM"
             />
 
-            {categoryIsCustom ? (
+            <SelectField
+              icon={<Bell size={18} color={colors.ink} strokeWidth={2} />}
+              label="Reminder frequency"
+              valueLabel={frequencyLabelText}
+              selectedValue={form.reminderFrequency}
+              options={reminderFrequencyOptions}
+              open={frequencyOpen}
+              onToggle={() => {
+                setFrequencyOpen((open) => !open);
+                setAreaOpen(false);
+              }}
+              onSelect={handleFrequencySelect}
+            />
+
+            {form.reminderFrequency === "custom" ? (
               <Field
-                icon={<Folder size={18} color={colors.ink} strokeWidth={2} />}
-                label="Custom category"
-                value={form.category}
-                onChangeText={(value) => {
-                  setCustomCategory(value);
-                  updateField("category", value);
-                }}
-                placeholder="My category"
+                icon={<Bell size={18} color={colors.ink} strokeWidth={2} />}
+                label="Custom frequency minutes"
+                value={form.customReminderMinutes ?? ""}
+                onChangeText={(value) => updateField("customReminderMinutes", value)}
+                placeholder="45"
               />
             ) : null}
 
             <SelectField
-              icon={<Bell size={18} color={colors.ink} strokeWidth={2} />}
-              label="Reminder"
-              valueLabel={reminderLabel}
-              selectedValue={form.reminderOption}
-              options={reminderOptions}
-              open={reminderOpen}
+              icon={<Folder size={18} color={colors.ink} strokeWidth={2} />}
+              label="Area"
+              valueLabel={form.area || "No area"}
+              selectedValue={selectedAreaValue}
+              options={areaChoices}
+              open={areaOpen}
               onToggle={() => {
-                setReminderOpen((open) => !open);
-                setCategoryOpen(false);
+                setAreaOpen((open) => !open);
+                setFrequencyOpen(false);
               }}
-              onSelect={handleReminderSelect}
+              onSelect={handleAreaSelect}
             />
 
-            {form.reminderOption === "custom" ? (
+            {areaIsCustom || selectedAreaValue === "__custom" ? (
               <Field
-                icon={<Bell size={18} color={colors.ink} strokeWidth={2} />}
-                label="Reminder at"
-                value={form.reminderAt ?? ""}
-                onChangeText={(value) => updateField("reminderAt", value)}
-                placeholder="2026-05-25 8:30 AM"
+                icon={<Folder size={18} color={colors.ink} strokeWidth={2} />}
+                label="Custom area"
+                value={form.area ?? customArea}
+                onChangeText={(value) => {
+                  setCustomArea(value);
+                  updateField("area", value);
+                }}
+                placeholder="My area"
               />
             ) : null}
 
             <Field
               icon={<FileText size={18} color={colors.ink} strokeWidth={2} />}
-              label="Description"
-              value={form.description}
-              onChangeText={(value) => updateField("description", value)}
+              label="Notes"
+              value={form.notes}
+              onChangeText={(value) => updateField("notes", value)}
               multiline
               placeholder="Add useful details..."
             />

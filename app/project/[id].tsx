@@ -9,8 +9,8 @@ import { useAppState } from "@/contexts/app-state";
 import { overviewItems, type Task } from "@/data/tasks";
 import { goBackOrReplace } from "@/lib/navigation";
 
-function slugCategory(category: string) {
-  return category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+function slugArea(area: string) {
+  return area.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 export default function ProjectScreen() {
@@ -24,9 +24,9 @@ export default function ProjectScreen() {
     if (!id || id === "all") {
       return tasks;
     }
-    return tasks.filter((task) => slugCategory(task.category) === id);
+    return tasks.filter((task) => task.area && slugArea(task.area) === id);
   }, [id, tasks]);
-  const projectName = id === "all" || !id ? "All Tasks" : visibleTasks[0]?.category ?? "Category";
+  const projectName = id === "all" || !id ? "All Tasks" : visibleTasks[0]?.area ?? "Area";
   const completed = visibleTasks.filter((task) => task.status === "completed").length;
   const progress = visibleTasks.length ? Math.round((completed / visibleTasks.length) * 100) : 0;
 
