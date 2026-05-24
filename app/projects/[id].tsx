@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Archive, CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock3, Edit3, Flame, Image as ImageIcon, MoreVertical, RotateCcw, Trash2 } from "lucide-react-native";
+import { CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock3, Edit3, Flame, Image as ImageIcon, MoreVertical, Trash2, X } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { MemoryDetailModal } from "@/components/memory-detail-modal";
 import { PhotoProofModal } from "@/components/photo-proof-modal";
@@ -27,8 +27,6 @@ export default function ProjectDetailScreen() {
     loading,
     proofProjects,
     updateProofProject,
-    archiveProofProject,
-    restoreProofProject,
     deleteProofProject,
     getProjectMemories,
     getProofProjectStatusForDate,
@@ -37,13 +35,13 @@ export default function ProjectDetailScreen() {
   const [selectedMemory, setSelectedMemory] = useState<ProofEntry | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
   const project = proofProjects.find((item) => item.id === id);
   const memories = useMemo(() => (project ? getProjectMemories(project.id) : []), [getProjectMemories, project]);
   const today = todayKey();
   const todayMemory = memories.find((memory) => memory.date === today);
-  const archived = Boolean(project?.archivedAt);
-  const status = project ? (archived ? "archived" : getProofProjectStatusForDate(project.id, today)) : "pending";
+  const status = project ? getProofProjectStatusForDate(project.id, today) : "pending";
   const recentMemories = memories.slice(0, 6);
 
   useEffect(() => {
@@ -75,37 +73,25 @@ export default function ProjectDetailScreen() {
             Project not found
           </Text>
           <Text selectable style={{ color: colors.muted, fontSize: 14, lineHeight: 20 }}>
-            It may have been archived or removed.
+            It may have been removed.
           </Text>
         </View>
       </AppShell>
     );
   }
 
-  const statusColor = status === "completed" ? colors.greenDark : status === "missed" ? colors.red : status === "archived" ? colors.muted : colors.orange;
-  const statusBg = status === "completed" ? colors.greenSoft : status === "missed" ? "rgba(255,60,66,0.10)" : status === "archived" ? colors.faint : colors.orangeSoft;
-
-  const confirmArchive = () => {
-    setMenuOpen(false);
-    Alert.alert("Archive project?", "This will hide the project from active projects, but your memories will stay saved.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Archive", onPress: () => archiveProofProject(project.id) },
-    ]);
-  };
+  const statusColor = status === "completed" ? colors.greenDark : status === "missed" ? colors.red : colors.orange;
+  const statusBg = status === "completed" ? colors.greenSoft : status === "missed" ? "rgba(255,60,66,0.10)" : colors.orangeSoft;
 
   const confirmDelete = () => {
     setMenuOpen(false);
-    Alert.alert("Delete project?", "This will permanently delete this project and all linked proof memories. This cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete Project",
-        style: "destructive",
-        onPress: async () => {
-          await deleteProofProject(project.id);
-          router.replace("/projects" as never);
-        },
-      },
-    ]);
+    setDeleteConfirmOpen(true);
+  };
+
+  const deleteProject = async () => {
+    setDeleteConfirmOpen(false);
+    await deleteProofProject(project.id);
+    router.replace("/projects" as never);
   };
 
   return (
@@ -206,10 +192,10 @@ export default function ProjectDetailScreen() {
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
                     <Text selectable style={{ color: colors.ink, fontSize: 15, fontWeight: "900" }}>
-                      {status === "completed" ? "Proof saved today" : status === "missed" ? "Missed today" : status === "archived" ? "Project archived" : "Proof pending today"}
+                      {status === "completed" ? "Proof saved today" : status === "missed" ? "Missed today" : "Proof pending today"}
                     </Text>
                     <Text selectable style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>
-                      {todayMemory ? `Completed at ${todayMemory.time}` : archived ? "Archived projects do not trigger alarms." : scheduleText(project)}
+                      {todayMemory ? `Completed at ${todayMemory.time}` : scheduleText(project)}
                     </Text>
                   </View>
                 </View>
@@ -236,12 +222,6 @@ export default function ProjectDetailScreen() {
                       </Text>
                     </View>
                   </Pressable>
-                ) : archived ? (
-                  <View style={{ borderRadius: radii.md, borderCurve: "continuous", backgroundColor: colors.faint, padding: 13 }}>
-                    <Text selectable style={{ color: colors.muted, fontSize: 13, fontWeight: "800", textAlign: "center" }}>
-                      Restore this project to add new photo proof.
-                    </Text>
-                  </View>
                 ) : (
                   <Pressable
                     accessibilityRole="button"
@@ -368,18 +348,17 @@ export default function ProjectDetailScreen() {
         <MemoryDetailModal memory={selectedMemory} onClose={() => setSelectedMemory(null)} />
         <ProjectActionMenu
           visible={menuOpen}
-          projectArchived={archived}
           onClose={() => setMenuOpen(false)}
           onEdit={() => {
             setMenuOpen(false);
             setEditOpen(true);
           }}
-          onArchive={confirmArchive}
-          onRestore={async () => {
-            setMenuOpen(false);
-            await restoreProofProject(project.id);
-          }}
           onDelete={confirmDelete}
+        />
+        <ProjectDeleteConfirmModal
+          visible={deleteConfirmOpen}
+          onClose={() => setDeleteConfirmOpen(false)}
+          onDelete={deleteProject}
         />
         <ProjectEditorModal
           open={editOpen}
@@ -449,19 +428,13 @@ function EmptyProjectState({ text }: { text: string }) {
 
 function ProjectActionMenu({
   visible,
-  projectArchived,
   onClose,
   onEdit,
-  onArchive,
-  onRestore,
   onDelete,
 }: {
   visible: boolean;
-  projectArchived: boolean;
   onClose: () => void;
   onEdit: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
   onDelete: () => void;
 }) {
   const { colors } = useAppState();
@@ -498,12 +471,106 @@ function ProjectActionMenu({
           }}
         >
           <ProjectMenuRow icon={<Edit3 size={18} color={colors.ink} />} label="Edit Project" onPress={onEdit} />
-          {projectArchived ? (
-            <ProjectMenuRow icon={<RotateCcw size={18} color={colors.greenDark} />} label="Restore Project" onPress={onRestore} />
-          ) : (
-            <ProjectMenuRow icon={<Archive size={18} color={colors.ink} />} label="Archive Project" onPress={onArchive} />
-          )}
           <ProjectMenuRow icon={<Trash2 size={18} color={colors.red} />} label="Delete Project" onPress={onDelete} danger />
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ProjectDeleteConfirmModal({
+  visible,
+  onClose,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+}) {
+  const { colors } = useAppState();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: "rgba(5,10,14,0.62)", justifyContent: "center", padding: 22 }}>
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 390,
+            alignSelf: "center",
+            borderRadius: 24,
+            borderCurve: "continuous",
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: colors.surface,
+            padding: 18,
+            gap: 14,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: "rgba(255,60,66,0.12)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Trash2 size={19} color={colors.red} />
+            </View>
+            <Text selectable style={{ flex: 1, color: colors.ink, fontSize: 20, fontWeight: "900" }}>
+              Delete project?
+            </Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cancel delete project" onPress={onClose} style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" }}>
+              <X size={20} color={colors.ink} />
+            </Pressable>
+          </View>
+
+          <Text selectable style={{ color: colors.muted, fontSize: 14, lineHeight: 20, fontWeight: "700" }}>
+            This will permanently delete this project and all linked proof memories. This cannot be undone.
+          </Text>
+
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Cancel project delete"
+              onPress={onClose}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: 48,
+                borderRadius: radii.md,
+                borderCurve: "continuous",
+                backgroundColor: colors.faint,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.76 : 1,
+              })}
+            >
+              <Text selectable style={{ color: colors.ink, fontSize: 14, fontWeight: "900" }}>
+                Cancel
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Confirm delete project"
+              onPress={onDelete}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: 48,
+                borderRadius: radii.md,
+                borderCurve: "continuous",
+                backgroundColor: colors.red,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: pressed ? 0.78 : 1,
+              })}
+            >
+              <Text selectable style={{ color: colors.surface, fontSize: 14, fontWeight: "900" }}>
+                Delete Project
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>

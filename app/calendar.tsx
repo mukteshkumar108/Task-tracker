@@ -220,8 +220,7 @@ export default function CalendarScreen() {
                   dateKey < todayKey()
                     ? proofTasks.filter((task) => {
                         const createdDate = todayKey(new Date(task.createdAt));
-                        const archivedDate = task.archivedAt ? todayKey(new Date(task.archivedAt)) : null;
-                        return hasValidProjectBasics(task) && createdDate <= dateKey && (!archivedDate || archivedDate > dateKey) && !dayProofs.some((entry) => entry.proofTaskId === task.id || entry.projectId === task.id);
+                        return hasValidProjectBasics(task) && createdDate <= dateKey && !dayProofs.some((entry) => entry.proofTaskId === task.id || entry.projectId === task.id);
                       }).length
                     : 0;
                 const hasCompleted = dayProofs.length > 0 || dayTasks.some((task) => task.status === "completed");

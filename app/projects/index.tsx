@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Folder, Plus } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { PhotoProofModal } from "@/components/photo-proof-modal";
@@ -33,11 +33,8 @@ export default function ProjectsScreen() {
   } = useAppState();
   const [createOpen, setCreateOpen] = useState(false);
   const [proofProject, setProofProject] = useState<ProofTask | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
-  const activeProjects = useMemo(() => proofProjects.filter((project) => !project.archivedAt), [proofProjects]);
-  const archivedProjects = useMemo(() => proofProjects.filter((project) => project.archivedAt), [proofProjects]);
-  const projects = showArchived ? archivedProjects : activeProjects;
+  const projects = proofProjects;
 
   useEffect(() => {
     if (!loading && !user) {
@@ -56,11 +53,6 @@ export default function ProjectsScreen() {
             <Text selectable style={{ color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: 3 }}>
               Discipline folders
             </Text>
-          </View>
-
-          <View style={{ flexDirection: "row", gap: 8, alignSelf: "center" }}>
-            <FilterChip label="Active" active={!showArchived} onPress={() => setShowArchived(false)} count={activeProjects.length} />
-            <FilterChip label="Archived" active={showArchived} onPress={() => setShowArchived(true)} count={archivedProjects.length} />
           </View>
 
           {error ? (
@@ -87,10 +79,10 @@ export default function ProjectsScreen() {
             >
               <Folder size={42} color={colors.green} strokeWidth={2} />
               <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900", marginTop: 16 }}>
-                {showArchived ? "No archived projects" : "No projects yet"}
+                No projects yet
               </Text>
               <Text selectable style={{ color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 7 }}>
-                {showArchived ? "Archived projects will live here with their memories kept safe." : "Create folders for habits like Fitness, Flute, Study, or Business."}
+                Create folders for habits like Fitness, Flute, Study, or Business.
               </Text>
             </View>
           ) : (
@@ -98,13 +90,10 @@ export default function ProjectsScreen() {
               {projects.map((project) => {
                 const memories = getProjectMemories(project.id);
                 const latestMemory = memories[0];
-                const archived = Boolean(project.archivedAt);
-                const status = archived ? "archived" : getProofProjectStatusForDate(project.id, todayKey());
-                const statusTone =
-                  status === "completed" ? colors.greenDark : status === "missed" ? colors.red : status === "archived" ? colors.muted : colors.orange;
-                const statusBg =
-                  status === "completed" ? colors.greenSoft : status === "missed" ? "rgba(255,60,66,0.10)" : status === "archived" ? colors.faint : colors.orangeSoft;
-                const actionLabel = archived ? "Open Project" : status === "completed" ? "Open Project" : "Add Photo Proof";
+                const status = getProofProjectStatusForDate(project.id, todayKey());
+                const statusTone = status === "completed" ? colors.greenDark : status === "missed" ? colors.red : colors.orange;
+                const statusBg = status === "completed" ? colors.greenSoft : status === "missed" ? "rgba(255,60,66,0.10)" : colors.orangeSoft;
+                const actionLabel = status === "completed" ? "Open Project" : "Add Photo Proof";
 
                 return (
                   <View
@@ -166,7 +155,7 @@ export default function ProjectsScreen() {
                         accessibilityRole={webSafeButtonRole}
                         accessibilityLabel={`${actionLabel} for ${project.name}`}
                         onPress={() => {
-                          if (!archived && status !== "completed") {
+                          if (status !== "completed") {
                             setProofProject(project);
                           } else {
                             router.push(`/projects/${project.id}` as never);
@@ -176,14 +165,14 @@ export default function ProjectsScreen() {
                           minHeight: 38,
                           borderRadius: radii.pill,
                           borderCurve: "continuous",
-                          backgroundColor: !archived && status !== "completed" ? colors.green : colors.greenSoft,
+                          backgroundColor: status !== "completed" ? colors.green : colors.greenSoft,
                           paddingHorizontal: 13,
                           alignItems: "center",
                           justifyContent: "center",
                           opacity: pressed ? 0.78 : 1,
                         })}
                       >
-                        <Text selectable style={{ color: !archived && status !== "completed" ? colors.surface : colors.greenDark, fontSize: 12, fontWeight: "900" }}>
+                        <Text selectable style={{ color: status !== "completed" ? colors.surface : colors.greenDark, fontSize: 12, fontWeight: "900" }}>
                           {actionLabel}
                         </Text>
                       </Pressable>
@@ -195,35 +184,33 @@ export default function ProjectsScreen() {
           )}
         </View>
 
-        {!showArchived ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Create project"
-            onPress={() => setCreateOpen(true)}
-            style={({ pressed }) => ({
-              position: "absolute",
-              right: 22,
-              bottom: 92,
-              width: 58,
-              height: 58,
-              borderRadius: 29,
-              backgroundColor: colors.green,
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: pressed ? 0.78 : 1,
-              boxShadow: "0 12px 25px rgba(33, 147, 95, 0.30)",
-            })}
-          >
-            <Plus size={31} color={colors.surface} strokeWidth={2.2} />
-          </Pressable>
-        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Create project"
+          onPress={() => setCreateOpen(true)}
+          style={({ pressed }) => ({
+            position: "absolute",
+            right: 22,
+            bottom: 92,
+            width: 58,
+            height: 58,
+            borderRadius: 29,
+            backgroundColor: colors.green,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: pressed ? 0.78 : 1,
+            boxShadow: "0 12px 25px rgba(33, 147, 95, 0.30)",
+          })}
+        >
+          <Plus size={31} color={colors.surface} strokeWidth={2.2} />
+        </Pressable>
 
         <BottomNav active="projects" />
         <ProjectEditorModal
           open={createOpen}
           title="Create Project"
           submitLabel="Create Project"
-          duplicateProjects={activeProjects}
+          duplicateProjects={proofProjects}
           onClose={() => setCreateOpen(false)}
           onSubmit={addProofProject}
           onOpenDuplicate={(project) => {
@@ -234,35 +221,5 @@ export default function ProjectsScreen() {
         <PhotoProofModal project={proofProject} onClose={() => setProofProject(null)} />
       </View>
     </AppShell>
-  );
-}
-
-function FilterChip({ label, count, active, onPress }: { label: string; count: number; active: boolean; onPress: () => void }) {
-  const { colors } = useAppState();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label} projects`}
-      onPress={onPress}
-      style={({ pressed }) => ({
-        minHeight: 34,
-        borderRadius: radii.pill,
-        borderCurve: "continuous",
-        backgroundColor: active ? colors.greenSoft : colors.faint,
-        paddingHorizontal: 12,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        opacity: pressed ? 0.72 : 1,
-      })}
-    >
-      <Text selectable style={{ color: active ? colors.greenDark : colors.muted, fontSize: 12, fontWeight: "900" }}>
-        {label}
-      </Text>
-      <Text selectable style={{ color: active ? colors.greenDark : colors.muted, fontSize: 12, fontWeight: "800", fontVariant: ["tabular-nums"] }}>
-        {count}
-      </Text>
-    </Pressable>
   );
 }

@@ -19,7 +19,6 @@ export default function MemoriesScreen() {
   const folders = useMemo(
     () =>
       proofProjects
-        .filter((project) => !project.archivedAt)
         .map((project) => ({ project, memories: getProjectMemories(project.id) }))
         .filter((folder) => folder.memories.length > 0)
         .sort((a, b) => (b.memories[0]?.createdAt ?? "").localeCompare(a.memories[0]?.createdAt ?? "")),

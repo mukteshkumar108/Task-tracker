@@ -81,14 +81,11 @@ type AppState = {
   addProofTask: (input: ProofTaskInput) => Promise<ProofTask>;
   addProofProject: (input: ProofTaskInput) => Promise<ProofTask>;
   updateProofProject: (projectId: string, input: ProofProjectUpdateInput) => Promise<void>;
-  archiveProofProject: (projectId: string) => Promise<void>;
-  restoreProofProject: (projectId: string) => Promise<void>;
   deleteProofProject: (projectId: string) => Promise<void>;
   completeProofTaskWithPhoto: (taskId: string, input: ProofCompletionInput) => Promise<ProofEntry>;
   completeProjectProof: (projectId: string, input: ProofCompletionInput) => Promise<ProofEntry>;
   updateProofMemoryNote: (memoryId: string, note: string) => Promise<void>;
   moveProofMemoryToProject: (memoryId: string, projectId: string) => Promise<void>;
-  archiveProofMemory: (memoryId: string) => Promise<void>;
   deleteProofMemory: (memoryId: string) => Promise<void>;
   getProofEntriesForDate: (dateKey: string) => ProofEntry[];
   getMissedProofTasksForDate: (dateKey: string) => ProofTask[];
@@ -343,7 +340,7 @@ function normalizeStoredProofTasks(storedTasks: Partial<ProofTask>[]) {
       streakCount: currentStreak,
       createdAt: cleanText(task.createdAt, new Date().toISOString()),
       updatedAt: cleanText(task.updatedAt, new Date().toISOString()),
-      archivedAt: task.archivedAt ?? null,
+      archivedAt: null,
     };
   });
 }
@@ -384,7 +381,7 @@ function normalizeStoredProofEntries(storedEntries: Partial<ProofEntry>[]) {
         scheduleMode,
         fixedTime: scheduleMode === "fixed" ? entry.fixedTime ?? null : null,
         createdAt,
-        hiddenAt: entry.hiddenAt ?? null,
+        hiddenAt: null,
       };
     });
 }
@@ -432,9 +429,8 @@ function refreshProofProjectStats(projects: ProofTask[], entries: ProofEntry[], 
 
 function isProofTaskDueOnDate(task: ProofTask, dateKey: string) {
   const createdDate = todayKey(new Date(task.createdAt));
-  const archivedDate = task.archivedAt ? todayKey(new Date(task.archivedAt)) : null;
 
-  return createdDate <= dateKey && (!archivedDate || archivedDate > dateKey);
+  return createdDate <= dateKey;
 }
 
 function isSameOrBeforeToday(dateKey: string) {
@@ -959,60 +955,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [persistProofTasks, proofTasks]
   );
 
-  const archiveProofProject = useCallback(
-    async (projectId: string) => {
-      try {
-        setError(null);
-        const now = new Date().toISOString();
-        persistProofTasks(
-          proofTasks.map((project) =>
-            project.id === projectId
-              ? {
-                  ...project,
-                  archivedAt: now,
-                  alarmStoppedAt: now,
-                  snoozedUntil: null,
-                  updatedAt: now,
-                }
-              : project
-          )
-        );
-      } catch (projectError) {
-        const message = projectError instanceof Error ? projectError.message : "Project archive failed.";
-        setError(message);
-        throw projectError;
-      }
-    },
-    [persistProofTasks, proofTasks]
-  );
-
-  const restoreProofProject = useCallback(
-    async (projectId: string) => {
-      try {
-        setError(null);
-        const now = new Date().toISOString();
-        persistProofTasks(
-          proofTasks.map((project) =>
-            project.id === projectId
-              ? {
-                  ...project,
-                  archivedAt: null,
-                  alarmStoppedAt: null,
-                  snoozedUntil: null,
-                  updatedAt: now,
-                }
-              : project
-          )
-        );
-      } catch (projectError) {
-        const message = projectError instanceof Error ? projectError.message : "Project restore failed.";
-        setError(message);
-        throw projectError;
-      }
-    },
-    [persistProofTasks, proofTasks]
-  );
-
   const deleteProofProject = useCallback(
     async (projectId: string) => {
       try {
@@ -1040,9 +982,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const task = proofTasks.find((item) => item.id === taskId);
         if (!task) {
           throw new Error("Proof of Work task not found.");
-        }
-        if (task.archivedAt) {
-          throw new Error("Archived projects cannot receive new proof memories.");
         }
         const invalidReason = getInvalidProofProjectReason(task);
         if (invalidReason) {
@@ -1153,8 +1092,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (!memory) {
           throw new Error("Memory not found.");
         }
-        if (!project || project.archivedAt) {
-          throw new Error("Choose an active project.");
+        if (!project) {
+          throw new Error("Choose a project.");
         }
         const invalidReason = getInvalidProofProjectReason(project);
         if (invalidReason) {
@@ -1184,30 +1123,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         persistProofTasks(refreshProofProjectStats(proofTasks, nextProofEntries, [previousProjectId, project.id]));
       } catch (memoryError) {
         const message = memoryError instanceof Error ? memoryError.message : "Memory move failed.";
-        setError(message);
-        throw memoryError;
-      }
-    },
-    [persistProofEntries, persistProofTasks, proofEntries, proofTasks]
-  );
-
-  const archiveProofMemory = useCallback(
-    async (memoryId: string) => {
-      try {
-        setError(null);
-        const memory = proofEntries.find((entry) => entry.id === memoryId);
-        if (!memory) {
-          throw new Error("Memory not found.");
-        }
-
-        const now = new Date().toISOString();
-        const projectId = memory.projectId || memory.proofTaskId || memory.taskId;
-        const nextProofEntries = proofEntries.map((entry) => (entry.id === memoryId ? { ...entry, hiddenAt: now } : entry));
-
-        persistProofEntries(nextProofEntries);
-        persistProofTasks(refreshProofProjectStats(proofTasks, nextProofEntries, [projectId]));
-      } catch (memoryError) {
-        const message = memoryError instanceof Error ? memoryError.message : "Memory archive failed.";
         setError(message);
         throw memoryError;
       }
@@ -1321,9 +1236,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     return (
       proofTasks.find((project) => {
-        if (project.archivedAt) {
-          return false;
-        }
         const invalidReason = getInvalidProofProjectReason(project);
         if (invalidReason) {
           if (project.scheduleMode === "fixed") {
@@ -1537,14 +1449,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       addProofTask,
       addProofProject: addProofTask,
       updateProofProject,
-      archiveProofProject,
-      restoreProofProject,
       deleteProofProject,
       completeProofTaskWithPhoto,
       completeProjectProof: completeProofTaskWithPhoto,
       updateProofMemoryNote,
       moveProofMemoryToProject,
-      archiveProofMemory,
       deleteProofMemory,
       getProofEntriesForDate,
       getPendingProofTasksForDate,
@@ -1562,8 +1471,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     completeProofTaskWithPhoto,
     completeTask,
     completedHistoryTasks,
-    archiveProofMemory,
-    archiveProofProject,
     currentAlarmTask,
     currentProjectAlarm,
     deleteProofMemory,
@@ -1577,7 +1484,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     notificationCenterItems,
     proofEntries,
     proofTasks,
-    restoreProofProject,
     setThemeMode,
     signIn,
     signOut,
