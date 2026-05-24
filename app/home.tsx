@@ -113,8 +113,8 @@ function DrawerMenu({ onClose }: { onClose: () => void }) {
   const menuItems = [
     { label: "Home", icon: Home, href: "/home", active: true },
     { label: "Calendar", icon: CalendarDays, href: "/calendar" },
-    { label: "Proof of Work", icon: Camera, href: "/proof-of-work" },
-    { label: "Task History / Memories", icon: CheckCircle2, href: "/tasks" }
+    { label: "Projects", icon: Camera, href: "/projects" },
+    { label: "Memories", icon: CheckCircle2, href: "/memories" }
   ] as const;
   const secondaryItems = [
     {

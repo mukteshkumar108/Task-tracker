@@ -1,8 +1,9 @@
 import { useRouter } from "expo-router";
-import { CalendarDays, Camera, ChevronDown, Clock3, Plus } from "lucide-react-native";
+import { CalendarDays, Camera, ChevronDown, Clock3, Image as ImageIcon, Plus } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import { Image, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
+import { MemoryDetailModal } from "@/components/memory-detail-modal";
 import { AppShell, BottomNav, CheckMark, EmptyCircle, IconButton } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
@@ -20,6 +21,11 @@ function buildMonthCells(monthDate: Date) {
     date.setDate(start.getDate() + index);
     return date;
   });
+}
+
+function hasValidProjectBasics(task: { name: string; dailyProofTask: string; scheduleMode: string; fixedTime?: string | null }) {
+  const name = task.name.trim();
+  return Boolean(name && !name.toLowerCase().startsWith("untitled") && task.dailyProofTask.trim() && (task.scheduleMode !== "fixed" || task.fixedTime?.trim()));
 }
 
 function TaskTimelineCard({ task }: { task: Task }) {
@@ -72,12 +78,15 @@ function TaskTimelineCard({ task }: { task: Task }) {
   );
 }
 
-function ProofMemoryCard({ entry }: { entry: ProofEntry }) {
+function ProofMemoryCard({ entry, onPress }: { entry: ProofEntry; onPress: () => void }) {
   const { colors } = useAppState();
 
   return (
-    <View
-      style={{
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open memory for ${entry.projectName}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
         borderRadius: radii.md,
         borderCurve: "continuous",
         borderWidth: 1,
@@ -86,29 +95,30 @@ function ProofMemoryCard({ entry }: { entry: ProofEntry }) {
         padding: 12,
         flexDirection: "row",
         gap: 12,
-      }}
+        opacity: pressed ? 0.76 : 1,
+      })}
     >
       <Image source={{ uri: entry.photoUri }} style={{ width: 68, height: 68, borderRadius: 14, backgroundColor: colors.faint }} />
       <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
           <Camera size={16} color={colors.greenDark} strokeWidth={2.2} />
           <Text selectable numberOfLines={1} style={{ flex: 1, color: colors.ink, fontSize: 15, fontWeight: "900" }}>
-            {entry.title}
+            {entry.projectName || entry.title}
           </Text>
         </View>
         <Text selectable style={{ color: colors.greenDark, fontSize: 12, fontWeight: "800" }}>
-          Streak: {entry.streakCount} day{entry.streakCount === 1 ? "" : "s"}
+          Streak: {entry.streakAtCompletion} day{entry.streakAtCompletion === 1 ? "" : "s"}
         </Text>
         <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
-          Completed at {entry.time}
+          {entry.dailyProofTask} - Completed at {entry.time}
         </Text>
-        {entry.description ? (
+        {entry.note || entry.description ? (
           <Text selectable numberOfLines={2} style={{ color: colors.text, fontSize: 13, lineHeight: 18 }}>
-            {entry.description}
+            {entry.note || entry.description}
           </Text>
         ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -129,6 +139,7 @@ export default function CalendarScreen() {
   } = useAppState();
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [visibleMonth, setVisibleMonth] = useState(parseDateKey(todayKey()));
+  const [selectedMemory, setSelectedMemory] = useState<ProofEntry | null>(null);
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
   const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
   const selectedTasks = getTasksForDate(selectedDate);
@@ -147,7 +158,9 @@ export default function CalendarScreen() {
   }, [tasks]);
   const proofsByDate = useMemo(() => {
     const grouped = new Map<string, ProofEntry[]>();
-    proofEntries.forEach((entry) => {
+    proofEntries
+      .filter((entry) => !entry.hiddenAt)
+      .forEach((entry) => {
       const group = grouped.get(entry.date) ?? [];
       group.push(entry);
       grouped.set(entry.date, group);
@@ -179,6 +192,16 @@ export default function CalendarScreen() {
           </View>
 
           <View style={{ gap: 18 }}>
+            <View style={{ flexDirection: "row", justifyContent: "center", gap: 14 }}>
+              <LegendDot color={colors.green} label="Completed" />
+              <LegendDot color={colors.red} label="Missed" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <ImageIcon size={13} color={colors.greenDark} strokeWidth={2.2} />
+                <Text selectable style={{ color: colors.muted, fontSize: 11, fontWeight: "800" }}>
+                  Memory
+                </Text>
+              </View>
+            </View>
             <View style={{ flexDirection: "row" }}>
               {weekDays.map((day) => (
                 <Text key={day} selectable style={{ flex: 1, textAlign: "center", color: colors.muted, fontSize: 11, fontWeight: "800" }}>
@@ -198,7 +221,7 @@ export default function CalendarScreen() {
                     ? proofTasks.filter((task) => {
                         const createdDate = todayKey(new Date(task.createdAt));
                         const archivedDate = task.archivedAt ? todayKey(new Date(task.archivedAt)) : null;
-                        return createdDate <= dateKey && (!archivedDate || archivedDate > dateKey) && !dayProofs.some((entry) => entry.proofTaskId === task.id);
+                        return hasValidProjectBasics(task) && createdDate <= dateKey && (!archivedDate || archivedDate > dateKey) && !dayProofs.some((entry) => entry.proofTaskId === task.id || entry.projectId === task.id);
                       }).length
                     : 0;
                 const hasCompleted = dayProofs.length > 0 || dayTasks.some((task) => task.status === "completed");
@@ -234,10 +257,11 @@ export default function CalendarScreen() {
                         {date.getDate()}
                       </Text>
                     </View>
-                    <View style={{ height: 5, flexDirection: "row", gap: 4 }}>
+                    <View style={{ height: 8, flexDirection: "row", gap: 4, alignItems: "center" }}>
                       {hasCompleted ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green }} /> : null}
                       {missedProofCount > 0 ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.red }} /> : null}
                       {hasActiveTasks ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.orange }} /> : null}
+                      {dayProofs.length > 0 ? <ImageIcon size={7} color={colors.greenDark} strokeWidth={2.8} /> : null}
                     </View>
                   </Pressable>
                 );
@@ -269,7 +293,8 @@ export default function CalendarScreen() {
               </Text>
             </View>
 
-            {selectedCount === 0 ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 112 }}>
+              {selectedCount === 0 ? (
               <View
                 style={{
                   minHeight: 112,
@@ -286,13 +311,13 @@ export default function CalendarScreen() {
                   No memories on this date
                 </Text>
                 <Text selectable style={{ color: colors.muted, fontSize: 13, marginTop: 5, textAlign: "center" }}>
-                  Add a task or complete a Proof of Work.
+                  Add a task or save a project proof.
                 </Text>
               </View>
             ) : (
               <View style={{ gap: 12 }}>
                 {selectedProofEntries.map((entry) => (
-                  <ProofMemoryCard key={entry.id} entry={entry} />
+                  <ProofMemoryCard key={entry.id} entry={entry} onPress={() => setSelectedMemory(entry)} />
                 ))}
 
                 {selectedTasks.map((task) => (
@@ -329,10 +354,10 @@ export default function CalendarScreen() {
                       />
                       <View style={{ flex: 1, gap: 3, minWidth: 0 }}>
                         <Text selectable numberOfLines={1} style={{ color: colors.text, fontSize: 15, fontWeight: "700" }}>
-                          {task.title}
+                          {task.name}
                         </Text>
                         <Text selectable style={{ color: missed ? colors.red : colors.orange, fontSize: 12, fontWeight: "800" }}>
-                          {missed ? "Missed Proof of Work" : "Proof pending today"}
+                          {missed ? "Missed project proof" : "Proof pending today"}
                         </Text>
                       </View>
                       <Clock3 size={19} color={missed ? colors.red : colors.orange} strokeWidth={2.1} />
@@ -341,6 +366,7 @@ export default function CalendarScreen() {
                 })}
               </View>
             )}
+            </ScrollView>
           </View>
         </View>
 
@@ -366,7 +392,21 @@ export default function CalendarScreen() {
         </Pressable>
 
         <BottomNav active="calendar" />
+        <MemoryDetailModal memory={selectedMemory} onClose={() => setSelectedMemory(null)} />
       </View>
     </AppShell>
+  );
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  const { colors } = useAppState();
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+      <Text selectable style={{ color: colors.muted, fontSize: 11, fontWeight: "800" }}>
+        {label}
+      </Text>
+    </View>
   );
 }

@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { CalendarDays, ChevronRight, Circle, Check, Home, LayoutList } from "lucide-react-native";
+import { CalendarDays, ChevronRight, Circle, Check, Folder, Home } from "lucide-react-native";
 import type { ComponentType, ReactNode } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
@@ -327,13 +327,13 @@ export function EmptyCircle() {
   return <Circle size={22} color={colors.muted} strokeWidth={1.7} />;
 }
 
-export function BottomNav({ active }: { active: "home" | "calendar" | "tasks" }) {
+export function BottomNav({ active }: { active: "home" | "calendar" | "projects" }) {
   const router = useRouter();
   const { colors } = useAppState();
   const items = [
     { key: "home" as const, label: "Home", icon: Home, href: "/home" },
     { key: "calendar" as const, label: "Calendar", icon: CalendarDays, href: "/calendar" },
-    { key: "tasks" as const, label: "Tasks", icon: LayoutList, href: "/tasks" }
+    { key: "projects" as const, label: "Projects", icon: Folder, href: "/projects" }
   ];
 
   return (

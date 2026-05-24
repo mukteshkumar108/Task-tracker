@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 
 export type TaskStatus = "pending" | "in_progress" | "completed";
 export type ReminderFrequency = "none" | "5_minutes" | "15_minutes" | "30_minutes" | "1_hour" | "custom";
+export type ProofScheduleMode = "anytime" | "fixed";
 
 export type Subtask = {
   id: string;
@@ -46,39 +47,68 @@ export type TaskInput = {
 
 export type ProofTask = {
   id: string;
+  name: string;
+  dailyProofTask: string;
+  scheduleMode: ProofScheduleMode;
+  fixedTime: string | null;
+  alarmMessage: string;
+  reminderFrequency: ReminderFrequency;
+  customReminderMinutes: string | null;
+  area: string | null;
+  description: string;
+  currentStreak: number;
+  totalMemories: number;
+  latestPhotoUri: string | null;
+  lastCompletedDate: string | null;
+  alarmStoppedAt: string | null;
+  snoozedUntil: string | null;
   title: string;
   dailySchedule: string;
   reminderTime: string;
-  area: string | null;
-  description: string;
   streakCount: number;
-  lastCompletedDate: string | null;
   createdAt: string;
   updatedAt: string;
   archivedAt: string | null;
 };
 
 export type ProofTaskInput = {
-  title: string;
-  dailySchedule: string;
-  reminderTime: string;
+  name: string;
+  dailyProofTask: string;
+  scheduleMode: ProofScheduleMode;
+  fixedTime: string | null;
+  alarmMessage: string;
+  reminderFrequency: ReminderFrequency;
+  customReminderMinutes: string | null;
   area: string | null;
   description: string;
 };
 
 export type ProofEntry = {
   id: string;
+  proofId: string;
   proofTaskId: string;
+  taskId: string;
+  projectId: string;
+  projectName: string;
+  dailyProofTask: string;
   title: string;
+  taskTitle: string;
   photoUri: string;
   date: string;
   time: string;
+  completedAt: string;
+  note: string;
   description: string;
   area: string | null;
   streakCount: number;
+  streakAtCompletion: number;
+  scheduleMode: ProofScheduleMode;
+  fixedTime: string | null;
   createdAt: string;
   hiddenAt: string | null;
 };
+
+export type ProofProjectUpdateInput = Partial<ProofTaskInput>;
 
 export type ProofCompletionInput = {
   photoUri: string;
