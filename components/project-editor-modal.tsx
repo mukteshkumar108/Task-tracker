@@ -33,6 +33,7 @@ const defaultTime = "7:00 AM";
 type FieldErrors = Partial<Record<"name" | "fixedTime", string>>;
 type TouchedFields = Partial<Record<keyof ProofTaskInput | "customArea", boolean>>;
 type TimePeriod = "AM" | "PM";
+const blockedProjectNames = new Set(["untitled project", "untitled", "project"]);
 
 function isClockTime(value?: string | null) {
   return /^(1[0-2]|[1-9]):[0-5]\d\s(AM|PM)$/i.test((value || "").trim());
@@ -57,8 +58,12 @@ function formatTimeParts(hour: number, minute: number, period: TimePeriod) {
 
 function validateProjectForm(input: ProofTaskInput): FieldErrors {
   const errors: FieldErrors = {};
-  if (!input.name.trim()) {
+  const cleanName = input.name.trim();
+  const normalizedName = cleanName.toLowerCase();
+  if (!cleanName) {
     errors.name = "Project name is required.";
+  } else if (cleanName.length < 2 || /^\d+$/.test(cleanName) || blockedProjectNames.has(normalizedName)) {
+    errors.name = "Add a clear project name.";
   }
   if (input.scheduleMode === "fixed" && !isClockTime(input.fixedTime)) {
     errors.fixedTime = "Alarm time is required for fixed-time projects.";
@@ -275,9 +280,11 @@ export function ProjectEditorModal({
             <ProjectInput
               label="Project name"
               value={form.name}
-              onChangeText={(value) => updateForm("name", value)}
+              onChangeText={(value) => {
+                updateForm("name", value);
+                markTouched("name");
+              }}
               onBlur={() => markTouched("name")}
-              placeholder="Enter project name"
               error={errorFor("name")}
             />
 
@@ -374,7 +381,6 @@ export function ProjectEditorModal({
                   label="Alarm message"
                   value={form.alarmMessage}
                   onChangeText={(value) => updateForm("alarmMessage", value)}
-                  placeholder=""
                   multiline
                 />
               </>
@@ -485,7 +491,6 @@ export function ProjectEditorModal({
                   updateForm("area", value || null);
                 }}
                 onBlur={() => markTouched("customArea")}
-                placeholder="Custom area"
               />
             ) : null}
 
@@ -493,7 +498,6 @@ export function ProjectEditorModal({
               label="Description / Why this matters"
               value={form.description}
               onChangeText={(value) => updateForm("description", value)}
-              placeholder="Why this matters"
               multiline
             />
 
@@ -539,7 +543,6 @@ function ProjectInput({
   value,
   onChangeText,
   onBlur,
-  placeholder,
   error,
   multiline = false,
 }: {
@@ -547,7 +550,6 @@ function ProjectInput({
   value: string;
   onChangeText: (value: string) => void;
   onBlur?: () => void;
-  placeholder: string;
   error?: string;
   multiline?: boolean;
 }) {
@@ -562,8 +564,6 @@ function ProjectInput({
         value={value}
         onChangeText={onChangeText}
         onBlur={onBlur}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
         multiline={multiline}
         textAlignVertical={multiline ? "top" : "center"}
         style={{
