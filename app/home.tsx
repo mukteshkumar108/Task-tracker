@@ -194,8 +194,6 @@ function DrawerMenu({ onClose }: { onClose: () => void }) {
                   updateUserName(draftName);
                   setEditingName(false);
                 }}
-                placeholder="Your name"
-                placeholderTextColor={colors.muted}
                 style={{
                   minHeight: 42,
                   borderRadius: radii.sm,
