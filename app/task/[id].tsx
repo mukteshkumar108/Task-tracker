@@ -178,9 +178,9 @@ export default function TaskDetailScreen() {
 
         <View style={{ gap: 16 }}>
           <MetaRow icon={CalendarDays} label="Date" value={formatDateLabel(task.dueDate)} />
-          <MetaRow icon={Bell} label="Reminder starts" value={task.reminderStartTime} />
-          <MetaRow icon={Clock3} label="Due alarm" value={task.dueTime} />
-          <MetaRow icon={Bell} label="Repeat" value={frequencyLabel(task.reminderFrequency, task.customReminderMinutes)} />
+          <MetaRow icon={Bell} label="Reminder starts" value={task.reminderStartTime || "No reminder"} />
+          <MetaRow icon={Clock3} label="Alarm time" value={task.dueTime} />
+          <MetaRow icon={Bell} label="Reminder frequency" value={frequencyLabel(task.reminderFrequency, task.customReminderMinutes)} />
           <MetaRow icon={Folder} label="Area" value={task.area || "None"} />
         </View>
 
