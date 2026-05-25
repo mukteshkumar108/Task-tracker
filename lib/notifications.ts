@@ -137,11 +137,11 @@ export function getNextProjectAlarmDate(project: SchedulableProject, from = new 
 }
 
 export function buildReminderSchedule(task: SchedulableTask) {
-  const frequency = normaliseFrequency(task.reminderFrequency, task.customReminderMinutes);
-  if (!frequency) {
+  if (!task.reminderStartTime || !isStrictClockTimeLabel(task.reminderStartTime) || !isStrictClockTimeLabel(task.dueTime)) {
     return [];
   }
 
+  const frequency = normaliseFrequency(task.reminderFrequency, task.customReminderMinutes);
   const start = parseDueDateTime(task.dueDate, task.reminderStartTime);
   const due = parseDueDateTime(task.dueDate, task.dueTime);
   if (!start || !due || start >= due) {
@@ -150,6 +150,10 @@ export function buildReminderSchedule(task: SchedulableTask) {
 
   const reminders: Date[] = [];
   const now = Date.now();
+
+  if (!frequency) {
+    return start.getTime() > now ? [start] : [];
+  }
 
   for (let next = start.getTime(); next < due.getTime(); next += frequency * 60 * 1000) {
     if (next > now) {
@@ -197,7 +201,7 @@ export async function scheduleTaskNotifications(task: SchedulableTask): Promise<
 
   let alarmNotificationId: string | null = null;
   const due = parseDueDateTime(task.dueDate, task.dueTime);
-  if (due && due.getTime() > Date.now()) {
+  if (isStrictClockTimeLabel(task.dueTime) && due && due.getTime() > Date.now()) {
     // Expo Notifications gives us high-priority local notifications. True Android
     // full-screen alarms that ring indefinitely while the app is killed require
     // an EAS/dev build with native full-screen intent and exact-alarm handling.
