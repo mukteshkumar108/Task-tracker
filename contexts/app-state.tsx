@@ -126,6 +126,7 @@ const proofScheduleModeValues = new Set<ProofScheduleMode>(["anytime", "fixed"])
 const cleanTaskExamples = ["Practice Flute", "Study DSA", "Gym", "Read 10 pages", "Build Task Tracker", "Morning Walk"];
 const projectAlarmWindowMs = 2 * 60 * 1000;
 const blockedDemoTitles = new Set(["lund lele", "hugna", "untitled task", "test", "demo"]);
+const blockedProjectNames = new Set(["untitled project", "untitled", "project"]);
 
 function tasksKey(uid: string) {
   return `task-tracker:users:${uid}:tasks`;
@@ -162,9 +163,13 @@ function normalizeProofScheduleMode(value?: string | null): ProofScheduleMode {
 function proofProjectValidationErrors(input: ProofTaskInput) {
   const errors: Partial<Record<"name" | "fixedTime", string>> = {};
   const scheduleMode = normalizeProofScheduleMode(input.scheduleMode);
+  const cleanName = input.name.trim();
+  const normalizedName = cleanName.toLowerCase();
 
-  if (!input.name.trim()) {
+  if (!cleanName) {
     errors.name = "Project name is required.";
+  } else if (cleanName.length < 2 || /^\d+$/.test(cleanName) || blockedProjectNames.has(normalizedName)) {
+    errors.name = "Add a clear project name.";
   }
   if (scheduleMode === "fixed" && (!input.fixedTime?.trim() || !isStrictClockTimeLabel(input.fixedTime))) {
     errors.fixedTime = "Alarm time is required for fixed-time projects.";
@@ -187,7 +192,7 @@ function getInvalidProofProjectReason(project?: ProofTask | null) {
   }
 
   const name = project.name.trim();
-  if (!name || name.toLowerCase().startsWith("untitled")) {
+  if (!name || name.length < 2 || /^\d+$/.test(name) || blockedProjectNames.has(name.toLowerCase())) {
     return "Project name is missing.";
   }
   if (project.scheduleMode === "fixed" && (!project.fixedTime?.trim() || !isStrictClockTimeLabel(project.fixedTime))) {
@@ -215,14 +220,65 @@ function cleanDemoNote(note: string) {
   return note;
 }
 
+function taskTitleValidationError(title: string) {
+  const cleanTitleValue = title.trim();
+  const normalized = cleanTitleValue.toLowerCase();
+  if (!cleanTitleValue) {
+    return "Task title is required.";
+  }
+  if (cleanTitleValue.length < 2 || /^\d+$/.test(cleanTitleValue) || normalized === "untitled task" || normalized === "untitled") {
+    return "Add a clear task name.";
+  }
+
+  return null;
+}
+
+function taskInputValidationError(input: TaskInput) {
+  const titleError = taskTitleValidationError(input.title);
+  if (titleError) {
+    return titleError;
+  }
+  if (!isStrictClockTimeLabel(input.dueTime)) {
+    return "Alarm time is required.";
+  }
+
+  const alarmAt = parseDueDateTime(input.dueDate, input.dueTime);
+  if (!alarmAt) {
+    return "Choose a valid alarm time.";
+  }
+  if (alarmAt.getTime() <= Date.now()) {
+    return "Choose a future alarm time.";
+  }
+
+  if (input.reminderStartTime.trim()) {
+    if (!isStrictClockTimeLabel(input.reminderStartTime)) {
+      return "Choose a valid reminder time.";
+    }
+
+    const reminderAt = parseDueDateTime(input.dueDate, input.reminderStartTime);
+    if (!reminderAt) {
+      return "Choose a valid reminder time.";
+    }
+    if (reminderAt >= alarmAt) {
+      return "Reminder start time should be before alarm time.";
+    }
+  }
+
+  return null;
+}
+
 function normalizeTaskInput(input: TaskInput): TaskInput {
+  const validationError = taskInputValidationError(input);
+  if (validationError) {
+    throw new Error(validationError);
+  }
   const customMinutes = input.customReminderMinutes ? `${input.customReminderMinutes}`.trim() : null;
 
   return {
-    title: input.title.trim() || "Untitled task",
+    title: input.title.trim(),
     dueDate: input.dueDate.trim() || todayKey(),
-    reminderStartTime: input.reminderStartTime.trim() || input.dueTime.trim() || "9:00 AM",
-    dueTime: input.dueTime.trim() || input.reminderStartTime.trim() || "9:00 AM",
+    reminderStartTime: input.reminderStartTime.trim(),
+    dueTime: input.dueTime.trim(),
     reminderFrequency: normalizeFrequency(input.reminderFrequency),
     customReminderMinutes: customMinutes,
     area: input.area?.trim() || null,
@@ -231,9 +287,16 @@ function normalizeTaskInput(input: TaskInput): TaskInput {
 }
 
 function normalizeStoredTasks(storedTasks: LegacyTask[]) {
-  return storedTasks.map((legacyTask, index) => {
-    const dueTime = cleanText(legacyTask.dueTime, cleanText(legacyTask.time, "9:00 AM"));
-    const reminderStartTime = cleanText(legacyTask.reminderStartTime, dueTime);
+  return storedTasks
+    .filter((legacyTask) => {
+      const title = cleanText(legacyTask.title, "");
+      const dueTime = cleanText(legacyTask.dueTime, cleanText(legacyTask.time, ""));
+      return !taskTitleValidationError(title) && isStrictClockTimeLabel(dueTime);
+    })
+    .map((legacyTask) => {
+    const dueTime = cleanText(legacyTask.dueTime, cleanText(legacyTask.time, ""));
+    const storedReminderStartTime = cleanText(legacyTask.reminderStartTime, "");
+    const reminderStartTime = isStrictClockTimeLabel(storedReminderStartTime) ? storedReminderStartTime : "";
     const legacyArea = cleanText(legacyTask.area, cleanText(legacyTask.category, cleanText(legacyTask.project, "")));
     const area = legacyArea && legacyArea !== "General" ? legacyArea : null;
     const status = legacyTask.status === "completed" || legacyTask.status === "in_progress" ? legacyTask.status : "pending";
@@ -242,7 +305,7 @@ function normalizeStoredTasks(storedTasks: LegacyTask[]) {
 
     return {
       id: cleanText(legacyTask.id, createId("task")),
-      title: cleanDemoTitle(cleanText(legacyTask.title, cleanTaskExamples[index % cleanTaskExamples.length]), index),
+      title: cleanText(legacyTask.title, ""),
       status,
       dueDate: cleanText(legacyTask.dueDate, todayKey()),
       reminderStartTime,
@@ -1261,7 +1324,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
     return (
       tasks.find((task) => {
-        if (!isActiveTask(task) || task.dueDate !== today || task.alarmStoppedAt) {
+        if (!isActiveTask(task) || task.dueDate !== today || task.alarmStoppedAt || taskTitleValidationError(task.title) || !isStrictClockTimeLabel(task.dueTime)) {
           return false;
         }
 
@@ -1269,9 +1332,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (snoozedUntil > now.getTime()) {
           return false;
         }
+        if (snoozedUntil && todayKey(new Date(snoozedUntil)) === today) {
+          return now.getTime() - snoozedUntil <= projectAlarmWindowMs;
+        }
 
         const due = parseDueDateTime(task.dueDate, task.dueTime);
-        return Boolean(due && due.getTime() <= now.getTime());
+        if (!due) {
+          return false;
+        }
+        const elapsed = now.getTime() - due.getTime();
+        return elapsed >= 0 && elapsed <= projectAlarmWindowMs;
       }) ?? null
     );
   }, [nowTick, tasks]);
