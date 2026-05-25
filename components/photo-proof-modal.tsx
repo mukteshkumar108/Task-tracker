@@ -98,8 +98,6 @@ export function PhotoProofModal({
             <TextInput
               value={note}
               onChangeText={setNote}
-              placeholder="What did you do today?"
-              placeholderTextColor={colors.muted}
               multiline
               textAlignVertical="top"
               style={{
