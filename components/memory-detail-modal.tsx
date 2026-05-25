@@ -459,8 +459,6 @@ function EditNoteSheet({
           <TextInput
             value={note}
             onChangeText={onChangeNote}
-            placeholder="Add a note"
-            placeholderTextColor={colors.muted}
             multiline
             textAlignVertical="top"
             style={{
