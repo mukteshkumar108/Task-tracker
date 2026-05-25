@@ -23,7 +23,8 @@ export function AppShell({ children, scroll = true }: { children: ReactNode; scr
       style={{
         width: frameWidth,
         maxWidth: 430,
-        minHeight: "100%",
+        height: !scroll ? (isWide ? 820 : "100%") : undefined,
+        minHeight: scroll ? "100%" : undefined,
         alignSelf: isWide ? "center" : "flex-start",
         backgroundColor: colors.surface,
         overflow: "hidden",
@@ -32,7 +33,7 @@ export function AppShell({ children, scroll = true }: { children: ReactNode; scr
               borderRadius: 28,
               borderCurve: "continuous",
               marginVertical: 28,
-              minHeight: 820,
+              minHeight: scroll ? 820 : undefined,
               boxShadow: `0 14px 36px ${colors.shadow}`
             }
           : null)
