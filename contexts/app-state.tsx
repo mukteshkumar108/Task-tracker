@@ -19,7 +19,15 @@ import {
   type Task,
   type TaskInput,
 } from "@/data/tasks";
-import { cancelTaskNotifications, ensureNotificationPermission, parseDueDateTime, scheduleTaskNotifications } from "@/lib/notifications";
+import {
+  cancelProofProjectNotifications,
+  cancelTaskNotifications,
+  ensureNotificationPermission,
+  isStrictClockTimeLabel,
+  parseDueDateTime,
+  scheduleProjectNotifications,
+  scheduleTaskNotifications,
+} from "@/lib/notifications";
 import { readJson, removeValue, writeJson } from "@/lib/storage";
 
 type User = {
@@ -116,6 +124,7 @@ const SIGNED_OUT_KEY = "task-tracker:signed-out";
 const reminderFrequencyValues = new Set<ReminderFrequency>(["none", "5_minutes", "15_minutes", "30_minutes", "1_hour", "custom"]);
 const proofScheduleModeValues = new Set<ProofScheduleMode>(["anytime", "fixed"]);
 const cleanTaskExamples = ["Practice Flute", "Study DSA", "Gym", "Read 10 pages", "Build Task Tracker", "Morning Walk"];
+const projectAlarmWindowMs = 2 * 60 * 1000;
 const blockedDemoTitles = new Set(["lund lele", "hugna", "untitled task", "test", "demo"]);
 
 function tasksKey(uid: string) {
@@ -151,17 +160,14 @@ function normalizeProofScheduleMode(value?: string | null): ProofScheduleMode {
 }
 
 function proofProjectValidationErrors(input: ProofTaskInput) {
-  const errors: Partial<Record<"name" | "dailyProofTask" | "fixedTime", string>> = {};
+  const errors: Partial<Record<"name" | "fixedTime", string>> = {};
   const scheduleMode = normalizeProofScheduleMode(input.scheduleMode);
 
   if (!input.name.trim()) {
     errors.name = "Project name is required.";
   }
-  if (!input.dailyProofTask.trim()) {
-    errors.dailyProofTask = "Daily proof task is required.";
-  }
-  if (scheduleMode === "fixed" && !input.fixedTime?.trim()) {
-    errors.fixedTime = "Fixed time is required for fixed-time projects.";
+  if (scheduleMode === "fixed" && (!input.fixedTime?.trim() || !isStrictClockTimeLabel(input.fixedTime))) {
+    errors.fixedTime = "Alarm time is required for fixed-time projects.";
   }
 
   return errors;
@@ -169,7 +175,7 @@ function proofProjectValidationErrors(input: ProofTaskInput) {
 
 function assertValidProofProjectInput(input: ProofTaskInput) {
   const errors = proofProjectValidationErrors(input);
-  const firstError = errors.name ?? errors.dailyProofTask ?? errors.fixedTime;
+  const firstError = errors.name ?? errors.fixedTime;
   if (firstError) {
     throw new Error(firstError);
   }
@@ -184,11 +190,8 @@ function getInvalidProofProjectReason(project?: ProofTask | null) {
   if (!name || name.toLowerCase().startsWith("untitled")) {
     return "Project name is missing.";
   }
-  if (!project.dailyProofTask.trim()) {
-    return "Daily proof task is missing.";
-  }
-  if (project.scheduleMode === "fixed" && !project.fixedTime?.trim()) {
-    return "Fixed time is missing for a fixed-time project.";
+  if (project.scheduleMode === "fixed" && (!project.fixedTime?.trim() || !isStrictClockTimeLabel(project.fixedTime))) {
+    return "Alarm time is missing for a fixed-time project.";
   }
 
   return null;
@@ -201,30 +204,6 @@ function cleanDemoTitle(title: string, index: number) {
   }
 
   return title;
-}
-
-function inferredDailyProofTask(projectName: string) {
-  const normalized = projectName.toLowerCase();
-  if (normalized.includes("flute") || normalized.includes("bansuri")) {
-    return "Practice flute daily";
-  }
-  if (normalized.includes("fitness") || normalized.includes("gym")) {
-    return "Complete fitness proof";
-  }
-  if (normalized.includes("study") || normalized.includes("dsa")) {
-    return "Study DSA";
-  }
-  if (normalized.includes("walk")) {
-    return "Morning walk";
-  }
-  if (normalized.includes("read")) {
-    return "Read 10 pages";
-  }
-  if (normalized.includes("build") || normalized.includes("tracker")) {
-    return "Build Task Tracker";
-  }
-
-  return `Show up for ${projectName}`;
 }
 
 function cleanDemoNote(note: string) {
@@ -291,10 +270,11 @@ function normalizeProofTask(input: ProofTaskInput): ProofTaskInput {
 
   const scheduleMode = normalizeProofScheduleMode(input.scheduleMode);
   const fixedTime = scheduleMode === "fixed" ? input.fixedTime?.trim() ?? null : null;
+  const name = input.name.trim();
 
   return {
-    name: input.name.trim(),
-    dailyProofTask: input.dailyProofTask.trim(),
+    name,
+    dailyProofTask: input.dailyProofTask.trim() || name,
     scheduleMode,
     fixedTime,
     alarmMessage: input.alarmMessage.trim() || "Dude, yeh wala task toh nhi bhula?",
@@ -307,14 +287,12 @@ function normalizeProofTask(input: ProofTaskInput): ProofTaskInput {
 
 function normalizeStoredProofTasks(storedTasks: Partial<ProofTask>[]) {
   return storedTasks.map((task, index) => {
-    const scheduleMode = normalizeProofScheduleMode(task.scheduleMode);
-    const fixedTime = scheduleMode === "fixed" ? cleanText(task.fixedTime, cleanText(task.reminderTime, "")) : null;
+    const requestedScheduleMode = normalizeProofScheduleMode(task.scheduleMode);
+    const storedFixedTime = cleanText(task.fixedTime, cleanText(task.reminderTime, ""));
+    const fixedTime = requestedScheduleMode === "fixed" && isStrictClockTimeLabel(storedFixedTime) ? storedFixedTime : null;
+    const scheduleMode: ProofScheduleMode = requestedScheduleMode === "fixed" && fixedTime ? "fixed" : "anytime";
     const name = cleanDemoTitle(cleanText(task.name, cleanText(task.title, cleanTaskExamples[(index + 2) % cleanTaskExamples.length])), index + 2);
-    const legacyDailyTask = cleanText(task.dailyProofTask, cleanText(task.dailySchedule, ""));
-    const dailyProofTask = cleanDemoTitle(
-      legacyDailyTask && legacyDailyTask !== "Every day" && legacyDailyTask !== name ? legacyDailyTask : inferredDailyProofTask(name),
-      index + 3
-    );
+    const dailyProofTask = name;
     const currentStreak = Number(task.currentStreak ?? task.streakCount ?? 0);
 
     return {
@@ -332,6 +310,10 @@ function normalizeStoredProofTasks(storedTasks: Partial<ProofTask>[]) {
       totalMemories: Number(task.totalMemories ?? 0),
       latestPhotoUri: task.latestPhotoUri ?? null,
       lastCompletedDate: task.lastCompletedDate ?? null,
+      reminderAt: task.reminderAt ?? null,
+      notificationId: task.notificationId ?? null,
+      notificationIds: task.notificationIds ?? (task.notificationId ? [task.notificationId] : []),
+      alarmNotificationId: task.alarmNotificationId ?? null,
       alarmStoppedAt: task.alarmStoppedAt ?? null,
       snoozedUntil: task.snoozedUntil ?? null,
       title: name,
@@ -582,6 +564,44 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setError(message);
         return {
           ...task,
+          notificationId: null,
+          notificationIds: [],
+          alarmNotificationId: null,
+        };
+      }
+    },
+    []
+  );
+
+  const applyProjectNotifications = useCallback(
+    async (project: ProofTask, entries: ProofEntry[]) => {
+      const today = todayKey();
+      const completedToday = entries.some((entry) => isProjectEntry(entry, project.id) && entry.date === today && !entry.hiddenAt);
+      if (completedToday || getInvalidProofProjectReason(project)) {
+        return {
+          ...project,
+          reminderAt: null,
+          notificationId: null,
+          notificationIds: [],
+          alarmNotificationId: null,
+        };
+      }
+
+      try {
+        const scheduled = await scheduleProjectNotifications(project);
+        return {
+          ...project,
+          reminderAt: scheduled.reminderAt,
+          notificationId: scheduled.notificationIds[0] ?? null,
+          notificationIds: scheduled.notificationIds,
+          alarmNotificationId: scheduled.alarmNotificationId,
+        };
+      } catch (notificationError) {
+        const message = notificationError instanceof Error ? notificationError.message : "Project reminder scheduling failed.";
+        setError(message);
+        return {
+          ...project,
+          reminderAt: null,
           notificationId: null,
           notificationIds: [],
           alarmNotificationId: null,
@@ -891,6 +911,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           totalMemories: 0,
           latestPhotoUri: null,
           lastCompletedDate: null,
+          reminderAt: null,
+          notificationId: null,
+          notificationIds: [],
+          alarmNotificationId: null,
           alarmStoppedAt: null,
           snoozedUntil: null,
           createdAt: now,
@@ -898,15 +922,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           archivedAt: null,
         };
 
-        persistProofTasks([...proofTasks, proofTask]);
-        return proofTask;
+        const proofTaskWithNotifications = await applyProjectNotifications(proofTask, proofEntries);
+
+        persistProofTasks([...proofTasks, proofTaskWithNotifications]);
+        return proofTaskWithNotifications;
       } catch (proofError) {
         const message = proofError instanceof Error ? proofError.message : "Proof task save failed.";
         setError(message);
         throw proofError;
       }
     },
-    [persistProofTasks, proofTasks]
+    [applyProjectNotifications, persistProofTasks, proofEntries, proofTasks]
   );
 
   const updateProofProject = useCallback(
@@ -917,6 +943,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (!project) {
           throw new Error("Project not found.");
         }
+
+        await cancelProofProjectNotifications(project);
 
         const now = new Date().toISOString();
         const normalized = normalizeProofTask({
@@ -931,28 +959,32 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           description: input.description ?? project.description,
         });
 
-        persistProofTasks(
-          proofTasks.map((item) =>
-            item.id === projectId
-              ? {
-                  ...item,
-                  ...normalized,
-                  title: normalized.name,
-                  dailySchedule: normalized.dailyProofTask,
-                  reminderTime: normalized.fixedTime ?? "",
-                  snoozedUntil: null,
-                  updatedAt: now,
-                }
-              : item
-          )
+        const nextProject = await applyProjectNotifications(
+          {
+            ...project,
+            ...normalized,
+            title: normalized.name,
+            dailySchedule: normalized.dailyProofTask,
+            reminderTime: normalized.fixedTime ?? "",
+            reminderAt: null,
+            notificationId: null,
+            notificationIds: [],
+            alarmNotificationId: null,
+            alarmStoppedAt: null,
+            snoozedUntil: null,
+            updatedAt: now,
+          },
+          proofEntries
         );
+
+        persistProofTasks(proofTasks.map((item) => (item.id === projectId ? nextProject : item)));
       } catch (projectError) {
         const message = projectError instanceof Error ? projectError.message : "Project update failed.";
         setError(message);
         throw projectError;
       }
     },
-    [persistProofTasks, proofTasks]
+    [applyProjectNotifications, persistProofTasks, proofEntries, proofTasks]
   );
 
   const deleteProofProject = useCallback(
@@ -964,6 +996,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           throw new Error("Project not found.");
         }
 
+        await cancelProofProjectNotifications(project);
         persistProofEntries(proofEntries.filter((entry) => !isProjectEntry(entry, projectId)));
         persistProofTasks(proofTasks.filter((item) => item.id !== projectId));
       } catch (projectError) {
@@ -991,6 +1024,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           throw new Error("Photo proof is required to complete this task.");
         }
 
+        await cancelProofProjectNotifications(task);
+
         const now = new Date();
         const date = todayKey(now);
         const time = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -1006,9 +1041,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           taskId: task.id,
           projectId: task.id,
           projectName: task.name,
-          dailyProofTask: task.dailyProofTask,
+          dailyProofTask: task.name,
           title: task.name,
-          taskTitle: task.dailyProofTask,
+          taskTitle: task.name,
           photoUri: input.photoUri,
           date,
           time,
@@ -1032,6 +1067,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               item.id === taskId
                 ? {
                     ...item,
+                    reminderAt: null,
+                    notificationId: null,
+                    notificationIds: [],
+                    alarmNotificationId: null,
                     alarmStoppedAt: completedAt,
                     snoozedUntil: null,
                     updatedAt: now.toISOString(),
@@ -1109,9 +1148,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 taskId: project.id,
                 projectId: project.id,
                 projectName: project.name,
-                dailyProofTask: project.dailyProofTask,
+                dailyProofTask: project.name,
                 title: project.name,
-                taskTitle: project.dailyProofTask,
+                taskTitle: project.name,
                 area: project.area,
                 scheduleMode: project.scheduleMode,
                 fixedTime: project.fixedTime,
@@ -1158,11 +1197,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       try {
         setError(null);
         const now = new Date().toISOString();
+        const project = proofTasks.find((item) => item.id === projectId);
+        await cancelProofProjectNotifications(project);
         persistProofTasks(
           proofTasks.map((project) =>
             project.id === projectId
               ? {
                   ...project,
+                  reminderAt: null,
+                  notificationId: null,
+                  notificationIds: [],
+                  alarmNotificationId: null,
                   alarmStoppedAt: now,
                   snoozedUntil: null,
                   updatedAt: now,
@@ -1256,11 +1301,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (snoozedUntil > now.getTime()) {
           return false;
         }
+        if (snoozedUntil && todayKey(new Date(snoozedUntil)) === today) {
+          return now.getTime() - snoozedUntil <= projectAlarmWindowMs;
+        }
         const due = parseDueDateTime(today, project.fixedTime);
         if (!due) {
           console.warn(`Skipping invalid project alarm for ${project.id}: Fixed time could not be parsed.`);
         }
-        return Boolean(due && due.getTime() <= now.getTime());
+        const createdAt = new Date(project.createdAt);
+        if (!due || (!Number.isNaN(createdAt.getTime()) && createdAt.getTime() >= due.getTime())) {
+          return false;
+        }
+        const elapsed = now.getTime() - due.getTime();
+        return elapsed >= 0 && elapsed <= projectAlarmWindowMs;
       }) ?? null
     );
   }, [nowTick, proofEntries, proofTasks]);
@@ -1282,7 +1335,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       items.push({
         id: `project-alarm-${currentProjectAlarm.id}`,
         title: "Project alarm",
-        body: `${currentProjectAlarm.name}: ${currentProjectAlarm.dailyProofTask}`,
+        body: `${currentProjectAlarm.name} alarm time: ${currentProjectAlarm.fixedTime}.`,
         tone: "red",
       });
     }

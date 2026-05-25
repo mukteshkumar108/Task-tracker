@@ -6,7 +6,7 @@ import { useAppState } from "@/contexts/app-state";
 import type { ProofTask } from "@/data/tasks";
 
 function inferProjectIcon(project: ProofTask): LucideIcon | null {
-  const source = `${project.name} ${project.area ?? ""} ${project.dailyProofTask}`.toLowerCase();
+  const source = `${project.name} ${project.area ?? ""}`.toLowerCase();
 
   if (source.includes("fitness") || source.includes("gym") || source.includes("run") || source.includes("walk") || source.includes("health")) {
     return Dumbbell;

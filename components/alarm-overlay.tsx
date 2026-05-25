@@ -76,7 +76,7 @@ export function AlarmOverlay() {
           </Text>
           <Text selectable style={{ color: colors.muted, fontSize: 14, textAlign: "center" }}>
             {isProjectAlarm
-              ? `${currentProjectAlarm?.dailyProofTask} - Streak: ${currentProjectAlarm?.currentStreak ?? 0} days - ${currentProjectAlarm?.fixedTime}`
+              ? `Streak: ${currentProjectAlarm?.currentStreak ?? 0} days - Alarm time: ${currentProjectAlarm?.fixedTime}`
               : `Due at ${currentAlarmTask?.dueTime}`}
           </Text>
         </View>
@@ -84,7 +84,7 @@ export function AlarmOverlay() {
         <View style={{ alignSelf: "stretch", gap: 10 }}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={isProjectAlarm ? "Add Photo Proof" : "Mark completed"}
+            accessibilityLabel={isProjectAlarm ? "Add Today's Proof" : "Mark completed"}
             onPress={() => {
               if (currentProjectAlarm) {
                 setProofProject(currentProjectAlarm);
@@ -105,7 +105,7 @@ export function AlarmOverlay() {
           >
             <CheckCircle2 size={21} color={colors.surface} strokeWidth={2.4} />
             <Text selectable style={{ color: colors.surface, fontSize: 16, fontWeight: "900" }}>
-              {isProjectAlarm ? "Add Photo Proof" : "Mark Completed"}
+              {isProjectAlarm ? "Add Today's Proof" : "Mark Completed"}
             </Text>
           </Pressable>
 

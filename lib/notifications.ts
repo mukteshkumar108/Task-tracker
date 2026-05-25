@@ -1,7 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-import { frequencyMinutes, type ReminderFrequency, type Task, type TaskInput } from "@/data/tasks";
+import { frequencyMinutes, todayKey, type ProofTask, type ReminderFrequency, type Task, type TaskInput } from "@/data/tasks";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -21,9 +21,16 @@ export type ScheduledTaskNotifications = {
   reminderAt: string | null;
 };
 
+export type ScheduledProjectNotifications = ScheduledTaskNotifications;
+
 type SchedulableTask = Pick<
   TaskInput,
   "title" | "dueDate" | "reminderStartTime" | "dueTime" | "reminderFrequency" | "customReminderMinutes"
+>;
+
+type SchedulableProject = Pick<
+  ProofTask,
+  "name" | "scheduleMode" | "fixedTime" | "alarmMessage" | "reminderFrequency" | "customReminderMinutes" | "createdAt"
 >;
 
 const isWeb = Platform.OS === "web";
@@ -38,6 +45,10 @@ function normaliseFrequency(
   }
 
   return frequencyMinutes[reminderFrequency] ?? null;
+}
+
+export function isStrictClockTimeLabel(timeLabel?: string | null) {
+  return /^(1[0-2]|[1-9]):[0-5]\d\s(AM|PM)$/i.test((timeLabel || "").trim());
 }
 
 export async function ensureNotificationPermission() {
@@ -99,6 +110,30 @@ export function parseDueDateTime(dateKey: string, timeLabel: string) {
   }
 
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function getNextProjectAlarmDate(project: SchedulableProject, from = new Date()) {
+  if (project.scheduleMode !== "fixed" || !project.fixedTime || !isStrictClockTimeLabel(project.fixedTime)) {
+    return null;
+  }
+
+  const todayAlarm = parseDueDateTime(todayKey(from), project.fixedTime);
+  if (!todayAlarm) {
+    return null;
+  }
+
+  const createdAt = new Date(project.createdAt);
+  if (todayAlarm.getTime() <= from.getTime() || (!Number.isNaN(createdAt.getTime()) && todayAlarm.getTime() <= createdAt.getTime())) {
+    return addDays(todayAlarm, 1);
+  }
+
+  return todayAlarm;
 }
 
 export function buildReminderSchedule(task: SchedulableTask) {
@@ -189,6 +224,85 @@ export async function scheduleTaskNotifications(task: SchedulableTask): Promise<
   };
 }
 
+function buildProjectReminderSchedule(project: SchedulableProject, now = new Date()) {
+  const frequency = normaliseFrequency(project.reminderFrequency, project.customReminderMinutes);
+  if (!frequency) {
+    return [];
+  }
+
+  const alarmDate = getNextProjectAlarmDate(project, now);
+  const end =
+    project.scheduleMode === "fixed" && alarmDate
+      ? alarmDate
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const reminders: Date[] = [];
+
+  for (let next = now.getTime() + frequency * 60 * 1000; next < end.getTime() && reminders.length < 64; next += frequency * 60 * 1000) {
+    reminders.push(new Date(next));
+  }
+
+  return reminders;
+}
+
+export async function scheduleProjectNotifications(project: SchedulableProject): Promise<ScheduledProjectNotifications> {
+  const empty: ScheduledProjectNotifications = {
+    notificationIds: [],
+    alarmNotificationId: null,
+    reminderAt: null,
+  };
+
+  if (isWeb) {
+    return empty;
+  }
+
+  const permitted = await ensureNotificationPermission();
+  if (!permitted) {
+    return empty;
+  }
+
+  const reminders = buildProjectReminderSchedule(project);
+  const notificationIds: string[] = [];
+
+  for (const reminder of reminders) {
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Project reminder",
+        body: `${project.name || "Your project"}: add today's proof.`,
+        sound: "default",
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: reminder,
+        channelId: reminderChannelId,
+      },
+    });
+    notificationIds.push(id);
+  }
+
+  let alarmNotificationId: string | null = null;
+  const alarmDate = getNextProjectAlarmDate(project);
+  if (alarmDate && alarmDate.getTime() > Date.now()) {
+    alarmNotificationId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: project.alarmMessage || "Dude, yeh wala task toh nhi bhula?",
+        body: `${project.name || "Your project"} alarm time: ${project.fixedTime}.`,
+        sound: "default",
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: alarmDate,
+        channelId: alarmChannelId,
+      },
+    });
+  }
+
+  return {
+    notificationIds,
+    alarmNotificationId,
+    reminderAt: reminders[0]?.toISOString() ?? null,
+  };
+}
+
 export async function cancelNotificationIds(ids: Array<string | null | undefined>) {
   if (isWeb) {
     return;
@@ -210,5 +324,17 @@ export async function cancelTaskNotifications(task?: Partial<Task> | null) {
     ...(task.notificationIds ?? []),
     task.notificationId,
     task.alarmNotificationId,
+  ]);
+}
+
+export async function cancelProofProjectNotifications(project?: Partial<ProofTask> | null) {
+  if (!project) {
+    return;
+  }
+
+  await cancelNotificationIds([
+    ...(project.notificationIds ?? []),
+    project.notificationId,
+    project.alarmNotificationId,
   ]);
 }

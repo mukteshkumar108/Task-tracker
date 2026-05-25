@@ -3,13 +3,14 @@ import { Folder, Plus } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 
+import { MemoryDetailModal } from "@/components/memory-detail-modal";
 import { PhotoProofModal } from "@/components/photo-proof-modal";
 import { ProjectAvatar } from "@/components/project-avatar";
 import { ProjectEditorModal } from "@/components/project-editor-modal";
 import { AppShell, BottomNav } from "@/components/ui";
 import { radii } from "@/constants/theme";
 import { useAppState } from "@/contexts/app-state";
-import { todayKey, type ProofTask } from "@/data/tasks";
+import { todayKey, type ProofEntry, type ProofTask } from "@/data/tasks";
 
 function scheduleText(project: ProofTask) {
   return project.scheduleMode === "fixed" && project.fixedTime ? `Fixed time - ${project.fixedTime}` : "Anytime today";
@@ -33,6 +34,7 @@ export default function ProjectsScreen() {
   } = useAppState();
   const [createOpen, setCreateOpen] = useState(false);
   const [proofProject, setProofProject] = useState<ProofTask | null>(null);
+  const [selectedMemory, setSelectedMemory] = useState<ProofEntry | null>(null);
   const contentWidth = Math.max(300, Math.min(width, 430) - 44);
   const projects = proofProjects;
 
@@ -82,7 +84,7 @@ export default function ProjectsScreen() {
                 No projects yet
               </Text>
               <Text selectable style={{ color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 7 }}>
-                Create folders for habits like Fitness, Flute, Study, or Business.
+                Create a folder for any daily discipline you want to prove with photos.
               </Text>
             </View>
           ) : (
@@ -93,7 +95,8 @@ export default function ProjectsScreen() {
                 const status = getProofProjectStatusForDate(project.id, todayKey());
                 const statusTone = status === "completed" ? colors.greenDark : status === "missed" ? colors.red : colors.orange;
                 const statusBg = status === "completed" ? colors.greenSoft : status === "missed" ? "rgba(255,60,66,0.10)" : colors.orangeSoft;
-                const actionLabel = status === "completed" ? "Open Project" : "Add Photo Proof";
+                const todayMemory = memories.find((memory) => memory.date === todayKey());
+                const actionLabel = status === "completed" && todayMemory ? "View Memory" : status === "completed" ? "Open Project" : "Add Today's Proof";
 
                 return (
                   <View
@@ -122,9 +125,6 @@ export default function ProjectsScreen() {
                       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
                         <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 19, fontWeight: "900" }}>
                           {project.name}
-                        </Text>
-                        <Text selectable numberOfLines={1} style={{ color: colors.text, fontSize: 14, fontWeight: "700" }}>
-                          {project.dailyProofTask}
                         </Text>
                         <Text selectable style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>
                           {project.area || "No area"} - {scheduleText(project)}
@@ -157,6 +157,8 @@ export default function ProjectsScreen() {
                         onPress={() => {
                           if (status !== "completed") {
                             setProofProject(project);
+                          } else if (todayMemory) {
+                            setSelectedMemory(todayMemory);
                           } else {
                             router.push(`/projects/${project.id}` as never);
                           }
@@ -206,6 +208,7 @@ export default function ProjectsScreen() {
         </Pressable>
 
         <BottomNav active="projects" />
+        <MemoryDetailModal memory={selectedMemory} onClose={() => setSelectedMemory(null)} />
         <ProjectEditorModal
           open={createOpen}
           title="Create Project"

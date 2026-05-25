@@ -157,9 +157,6 @@ export function MemoryDetailModal({
                 <Text selectable style={{ color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: "900" }}>
                   {liveMemory.projectName || liveMemory.title}
                 </Text>
-                <Text selectable style={{ color: colors.text, fontSize: 15, fontWeight: "800" }}>
-                  {liveMemory.dailyProofTask || liveMemory.taskTitle}
-                </Text>
                 <Text selectable style={{ color: colors.greenDark, fontSize: 14, fontWeight: "900" }}>
                   Streak: {liveMemory.streakAtCompletion} day{liveMemory.streakAtCompletion === 1 ? "" : "s"}
                 </Text>
@@ -571,9 +568,11 @@ function ChangeProjectSheet({
                   <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 15, fontWeight: "900" }}>
                     {project.name}
                   </Text>
-                  <Text selectable numberOfLines={1} style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>
-                    {project.dailyProofTask}
-                  </Text>
+                  {project.area ? (
+                    <Text selectable numberOfLines={1} style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>
+                      {project.area}
+                    </Text>
+                  ) : null}
                 </Pressable>
               ))}
             </ScrollView>

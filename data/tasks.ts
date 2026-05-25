@@ -60,6 +60,10 @@ export type ProofTask = {
   totalMemories: number;
   latestPhotoUri: string | null;
   lastCompletedDate: string | null;
+  reminderAt: string | null;
+  notificationId: string | null;
+  notificationIds: string[];
+  alarmNotificationId: string | null;
   alarmStoppedAt: string | null;
   snoozedUntil: string | null;
   title: string;
@@ -258,6 +262,11 @@ export function previousDateKey(dateKey: string) {
 
 export function frequencyLabel(value: ReminderFrequency, customMinutes?: string | null) {
   if (value === "custom") {
+    const minutes = Number(customMinutes);
+    if (Number.isFinite(minutes) && minutes > 0 && minutes % 60 === 0) {
+      const hours = minutes / 60;
+      return `Every ${hours} hour${hours === 1 ? "" : "s"}`;
+    }
     return customMinutes ? `Every ${customMinutes} min` : "Custom";
   }
   return reminderFrequencyOptions.find((option) => option.value === value)?.label ?? "No repeat";

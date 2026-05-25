@@ -188,7 +188,7 @@ function MemoryGrid({
             <Image source={{ uri: memory.photoUri }} style={{ width: "100%", height: itemWidth * 1.18, backgroundColor: colors.faint }} />
             <View style={{ padding: 10, gap: 5 }}>
               <Text selectable numberOfLines={1} style={{ color: colors.ink, fontSize: 14, fontWeight: "900" }}>
-                {memory.dailyProofTask}
+                {memory.projectName || memory.title}
               </Text>
               <Text selectable style={{ color: colors.muted, fontSize: 11, fontWeight: "700" }}>
                 {formatDateLabel(memory.date)}

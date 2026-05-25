@@ -17,7 +17,7 @@ export default function ProjectScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { width } = useWindowDimensions();
-  const { colors, user, loading, tasks } = useAppState();
+  const { colors, user, loading, tasks, proofProjects } = useAppState();
   const [tab, setTab] = useState<"tasks" | "overview">("tasks");
   const contentWidth = Math.max(300, Math.min(width, 430) - 48);
   const visibleTasks = useMemo(() => {
@@ -35,6 +35,12 @@ export default function ProjectScreen() {
       router.replace("/");
     }
   }, [loading, router, user]);
+
+  useEffect(() => {
+    if (id && proofProjects.some((project) => project.id === id)) {
+      router.replace(`/projects/${id}` as never);
+    }
+  }, [id, proofProjects, router]);
 
   return (
     <AppShell scroll={false}>

@@ -23,9 +23,9 @@ function buildMonthCells(monthDate: Date) {
   });
 }
 
-function hasValidProjectBasics(task: { name: string; dailyProofTask: string; scheduleMode: string; fixedTime?: string | null }) {
+function hasValidProjectBasics(task: { name: string; scheduleMode: string; fixedTime?: string | null }) {
   const name = task.name.trim();
-  return Boolean(name && !name.toLowerCase().startsWith("untitled") && task.dailyProofTask.trim() && (task.scheduleMode !== "fixed" || task.fixedTime?.trim()));
+  return Boolean(name && !name.toLowerCase().startsWith("untitled") && (task.scheduleMode !== "fixed" || task.fixedTime?.trim()));
 }
 
 function TaskTimelineCard({ task }: { task: Task }) {
@@ -110,7 +110,7 @@ function ProofMemoryCard({ entry, onPress }: { entry: ProofEntry; onPress: () =>
           Streak: {entry.streakAtCompletion} day{entry.streakAtCompletion === 1 ? "" : "s"}
         </Text>
         <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
-          {entry.dailyProofTask} - Completed at {entry.time}
+          Completed at {entry.time}
         </Text>
         {entry.note || entry.description ? (
           <Text selectable numberOfLines={2} style={{ color: colors.text, fontSize: 13, lineHeight: 18 }}>
@@ -176,8 +176,8 @@ export default function CalendarScreen() {
 
   return (
     <AppShell scroll={false}>
-      <View style={{ flex: 1, paddingTop: 44 }}>
-        <View style={{ width: contentWidth, alignSelf: "center", gap: 24, flex: 1 }}>
+      <View style={{ flex: 1, paddingTop: 38 }}>
+        <View style={{ width: contentWidth, alignSelf: "center", gap: 16, flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View style={{ width: 40, height: 40 }} />
             <Pressable onPress={() => setVisibleMonth(parseDateKey(todayKey()))} style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
@@ -191,7 +191,7 @@ export default function CalendarScreen() {
             </IconButton>
           </View>
 
-          <View style={{ gap: 18 }}>
+          <View style={{ gap: 10 }}>
             <View style={{ flexDirection: "row", justifyContent: "center", gap: 14 }}>
               <LegendDot color={colors.green} label="Completed" />
               <LegendDot color={colors.red} label="Missed" />
@@ -209,7 +209,7 @@ export default function CalendarScreen() {
                 </Text>
               ))}
             </View>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", rowGap: 13 }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", rowGap: 4 }}>
               {monthCells.map((date) => {
                 const dateKey = todayKey(date);
                 const isSelected = dateKey === selectedDate;
@@ -233,13 +233,13 @@ export default function CalendarScreen() {
                       setSelectedDate(dateKey);
                       setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
                     }}
-                    style={{ width: `${100 / 7}%`, alignItems: "center", gap: 5 }}
+                    style={{ width: `${100 / 7}%`, alignItems: "center", gap: 2 }}
                   >
                     <View
                       style={{
-                        width: 42,
-                        height: 42,
-                        borderRadius: 21,
+                        width: 34,
+                        height: 34,
+                        borderRadius: 17,
                         backgroundColor: isSelected ? colors.green : "transparent",
                         alignItems: "center",
                         justifyContent: "center",
@@ -249,14 +249,14 @@ export default function CalendarScreen() {
                         selectable
                         style={{
                           color: isSelected ? colors.surface : isCurrentMonth ? colors.ink : colors.muted,
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: isSelected ? "900" : "600",
                         }}
                       >
                         {date.getDate()}
                       </Text>
                     </View>
-                    <View style={{ height: 8, flexDirection: "row", gap: 4, alignItems: "center" }}>
+                    <View style={{ height: 6, flexDirection: "row", gap: 3, alignItems: "center" }}>
                       {hasCompleted ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.green }} /> : null}
                       {missedProofCount > 0 ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.red }} /> : null}
                       {hasActiveTasks ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.orange }} /> : null}
@@ -273,7 +273,7 @@ export default function CalendarScreen() {
               flex: 1,
               marginHorizontal: -22,
               paddingHorizontal: 22,
-              paddingTop: 18,
+              paddingTop: 14,
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               backgroundColor: colors.surface,
@@ -292,7 +292,7 @@ export default function CalendarScreen() {
               </Text>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 112 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 132 }}>
               {selectedCount === 0 ? (
               <View
                 style={{

@@ -79,10 +79,10 @@ export function PhotoProofModal({
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <View style={{ flex: 1, gap: 4 }}>
                 <Text selectable style={{ color: colors.ink, fontSize: 20, fontWeight: "900" }}>
-                  Add Photo Proof
+                  Add Today's Proof
                 </Text>
                 <Text selectable numberOfLines={1} style={{ color: colors.muted, fontSize: 13, fontWeight: "700" }}>
-                  {project.name} - {project.dailyProofTask}
+                  {project.name}
                 </Text>
               </View>
               <Pressable

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock3, Edit3, Flame, Image as ImageIcon, MoreVertical, Trash2, X } from "lucide-react-native";
+import { Bell, CalendarDays, Camera, CheckCircle2, ChevronLeft, Clock3, Edit3, Flame, Image as ImageIcon, MoreVertical, Trash2, X } from "lucide-react-native";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
@@ -141,9 +141,6 @@ export default function ProjectDetailScreen() {
                   <Text selectable style={{ color: colors.ink, fontSize: 23, fontWeight: "900" }}>
                     {project.name}
                   </Text>
-                  <Text selectable numberOfLines={2} style={{ color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: "700" }}>
-                    {project.dailyProofTask}
-                  </Text>
                   <Text selectable style={{ color: colors.muted, fontSize: 12, fontWeight: "700" }}>
                     {project.area || "No area"} - {scheduleText(project)}
                   </Text>
@@ -225,7 +222,7 @@ export default function ProjectDetailScreen() {
                 ) : (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Add Photo Proof"
+                    accessibilityLabel="Add Today's Proof"
                     onPress={() => setProofProject(project)}
                     style={({ pressed }) => ({
                       minHeight: 52,
@@ -238,7 +235,7 @@ export default function ProjectDetailScreen() {
                     })}
                   >
                     <Text selectable style={{ color: colors.surface, fontSize: 15, fontWeight: "900" }}>
-                      Add Photo Proof
+                      Add Today's Proof
                     </Text>
                   </Pressable>
                 )}
@@ -247,19 +244,29 @@ export default function ProjectDetailScreen() {
 
             <View style={{ gap: 12 }}>
               <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900" }}>
-                Reminder / Alarm
+                Schedule
               </Text>
               <View style={{ borderRadius: radii.md, borderCurve: "continuous", borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 15, gap: 10 }}>
-                <InfoLine icon={<CalendarDays size={17} color={colors.muted} />} label="Schedule" value={scheduleText(project)} />
-                <InfoLine icon={<Clock3 size={17} color={colors.muted} />} label="Reminder" value={frequencyLabel(project.reminderFrequency, project.customReminderMinutes)} />
+                <InfoLine icon={<CalendarDays size={17} color={colors.muted} />} label="Schedule" value={project.scheduleMode === "fixed" ? "Fixed time" : "Anytime today"} />
+                {project.scheduleMode === "fixed" ? <InfoLine icon={<Clock3 size={17} color={colors.muted} />} label="Alarm time" value={project.fixedTime ?? "Not set"} /> : null}
+                <InfoLine icon={<Bell size={17} color={colors.muted} />} label="Reminder spam" value={frequencyLabel(project.reminderFrequency, project.customReminderMinutes)} />
                 {project.scheduleMode === "fixed" ? <InfoLine icon={<Camera size={17} color={colors.muted} />} label="Alarm message" value={project.alarmMessage} /> : null}
               </View>
             </View>
 
             <View style={{ gap: 12 }}>
-              <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900" }}>
-                Recent Memories
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900" }}>
+                  Recent Memories
+                </Text>
+                {memories.length > 0 ? (
+                  <Pressable accessibilityRole="button" accessibilityLabel="View all memories" onPress={() => router.push("/memories" as never)}>
+                    <Text selectable style={{ color: colors.greenDark, fontSize: 13, fontWeight: "900" }}>
+                      View all
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
               {recentMemories.length === 0 ? (
                 <EmptyProjectState text="No proof memories yet." />
               ) : (
@@ -293,52 +300,6 @@ export default function ProjectDetailScreen() {
                     </Pressable>
                   ))}
                 </ScrollView>
-              )}
-            </View>
-
-            <View style={{ gap: 12 }}>
-              <Text selectable style={{ color: colors.ink, fontSize: 17, fontWeight: "900" }}>
-                Project History
-              </Text>
-              {memories.length === 0 ? (
-                <EmptyProjectState text="History starts after your first photo proof." />
-              ) : (
-                <View style={{ gap: 10 }}>
-                  {memories.map((memory) => (
-                    <Pressable
-                      key={`history-${memory.id}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Open ${memory.date} memory`}
-                      onPress={() => setSelectedMemory(memory)}
-                      style={({ pressed }) => ({
-                        minHeight: 64,
-                        borderRadius: radii.md,
-                        borderCurve: "continuous",
-                        borderWidth: 1,
-                        borderColor: colors.line,
-                        backgroundColor: colors.surface,
-                        padding: 10,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 12,
-                        opacity: pressed ? 0.76 : 1,
-                      })}
-                    >
-                      <Image source={{ uri: memory.photoUri }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: colors.faint }} />
-                      <View style={{ flex: 1, gap: 3 }}>
-                        <Text selectable style={{ color: colors.text, fontSize: 14, fontWeight: "900" }}>
-                          {formatDateLabel(memory.date)}
-                        </Text>
-                        <Text selectable style={{ color: colors.muted, fontSize: 12 }}>
-                          Completed at {memory.time}
-                        </Text>
-                      </View>
-                      <Text selectable style={{ color: colors.greenDark, fontSize: 12, fontWeight: "900" }}>
-                        {memory.streakAtCompletion}d
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
               )}
             </View>
           </ScrollView>

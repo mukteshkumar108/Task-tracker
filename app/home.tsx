@@ -302,7 +302,11 @@ export default function HomeScreen() {
   return (
     <AppShell scroll={false}>
       <View style={{ flex: 1, paddingTop: 44 }}>
-        <View style={{ width: contentWidth, alignSelf: "center", gap: 26, flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ width: contentWidth, alignSelf: "center", gap: 26, paddingBottom: 140 }}
+        >
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <IconButton accessibilityLabel="Open menu" onPress={() => setDrawerOpen(true)}>
               <Menu size={26} color={colors.ink} strokeWidth={2} />
@@ -338,7 +342,7 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          <View style={{ gap: 14, flex: 1 }}>
+          <View style={{ gap: 14 }}>
             <SectionHeader title="Today's Tasks" actionHref="/tasks" actionLabel="View all" />
             <View style={{ gap: 12 }}>
               {loading ? (
@@ -380,7 +384,7 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-        </View>
+        </ScrollView>
 
         <Pressable
           accessibilityRole="button"
